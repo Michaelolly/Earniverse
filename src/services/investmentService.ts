@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 
@@ -237,21 +236,21 @@ export const sellInvestment = async (investmentId: string, userId: string): Prom
     }
     
     // Update user balance
-    const { error: balanceUpdateError } = await supabase
+    const { data: balanceData, error: balanceError } = await supabase
       .from('user_balances')
       .select('balance')
       .eq('user_id', userId)
       .single();
     
-    if (balanceUpdateError) {
-      console.error('Error fetching balance:', balanceUpdateError);
+    if (balanceError) {
+      console.error('Error fetching balance:', balanceError);
       return { success: false, error: 'Investment sold but failed to update balance' };
     }
     
     const { error: updateError } = await supabase
       .from('user_balances')
       .update({ 
-        balance: balanceUpdateError.data.balance + investment.current_value 
+        balance: balanceData.balance + investment.current_value 
       })
       .eq('user_id', userId);
     
