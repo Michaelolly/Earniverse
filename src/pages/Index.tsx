@@ -1,4 +1,6 @@
 
+import { useEffect } from "react";
+import { Link } from "react-router-dom";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import HeroSection from "@/components/sections/HeroSection";
@@ -7,9 +9,11 @@ import TasksSection from "@/components/sections/TasksSection";
 import InvestmentSection from "@/components/sections/InvestmentSection";
 import BettingSection from "@/components/sections/BettingSection";
 import CTASection from "@/components/sections/CTASection";
-import { useEffect } from "react";
+import { useAuth } from "@/context/AuthContext";
 
 const Index = () => {
+  const { user } = useAuth();
+
   // Scroll to top on page load
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -19,12 +23,20 @@ const Index = () => {
     <div className="min-h-screen flex flex-col">
       <Navbar />
       <main className="flex-grow">
-        <HeroSection />
+        <HeroSection 
+          isAuthenticated={!!user}
+          authLink={user ? "/dashboard" : "/auth"}
+          authText={user ? "Go to Dashboard" : "Get Started"}
+        />
         <FeaturesSection />
         <TasksSection />
         <InvestmentSection />
         <BettingSection />
-        <CTASection />
+        <CTASection 
+          isAuthenticated={!!user}
+          authLink={user ? "/dashboard" : "/auth"}
+          authText={user ? "Go to Dashboard" : "Join Now"}
+        />
       </main>
       <Footer />
     </div>

@@ -1,8 +1,19 @@
 
 import { Button } from "@/components/ui/button";
 import ParticleBackground from "@/components/ui/ParticleBackground";
+import { Link } from "react-router-dom";
 
-const HeroSection = () => {
+interface HeroSectionProps {
+  isAuthenticated?: boolean;
+  authLink?: string;
+  authText?: string;
+}
+
+const HeroSection = ({ 
+  isAuthenticated = false, 
+  authLink = "/auth", 
+  authText = "Get Started" 
+}: HeroSectionProps) => {
   return (
     <section className="relative h-screen flex items-center overflow-hidden bg-gradient-to-br from-earniverse-blue/90 to-earniverse-purple/90">
       <ParticleBackground />
@@ -19,11 +30,13 @@ const HeroSection = () => {
               grow wealth through investments, and enjoy entertainment through betting games.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 pt-4">
-              <Button size="lg" className="bg-earniverse-gold hover:bg-earniverse-royal-gold text-black">
-                Get Started
+              <Button size="lg" className="bg-earniverse-gold hover:bg-earniverse-royal-gold text-black" asChild>
+                <Link to={authLink}>
+                  {authText}
+                </Link>
               </Button>
               <Button size="lg" variant="outline" className="border-white text-white hover:bg-white/10">
-                Learn More
+                <a href="#features">Learn More</a>
               </Button>
             </div>
             <div className="pt-6">
