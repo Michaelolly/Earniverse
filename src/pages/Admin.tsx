@@ -14,7 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
 import { UserProfile, UserBalance, fetchAllUsers, fetchAllBalances, makeUserAdmin } from "@/services/userService";
-import { createTask, Task } from "@/services/taskService";
+import { createTask } from "@/services/taskService";
 import { format } from "date-fns";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
@@ -30,6 +30,19 @@ const taskFormSchema = z.object({
   expiration_date: z.string().optional().nullable(),
   is_active: z.boolean().default(true),
 });
+
+// Define the full Task type that matches what createTask expects
+export interface Task {
+  id: string;
+  created_at: string;
+  created_by: string;
+  title: string;
+  description?: string | null;
+  reward: number;
+  difficulty: string;
+  is_active: boolean;
+  expiration_date?: string | null;
+}
 
 const Admin = () => {
   const { user, loading } = useAuth();
@@ -60,20 +73,31 @@ const Admin = () => {
 
     const checkAdmin = async () => {
       if (user) {
-        const admin = await isUserAdmin(user.id);
-        
-        if (!admin) {
+        try {
+          console.log("Checking admin status for user:", user.id);
+          const admin = await isUserAdmin(user.id);
+          
+          if (!admin) {
+            toast({
+              title: "Access Denied",
+              description: "You don't have permission to access this page",
+              variant: "destructive",
+            });
+            navigate("/dashboard");
+            return;
+          }
+          
+          setIsAdmin(admin);
+          await fetchData();
+        } catch (error) {
+          console.error("Error checking admin status:", error);
           toast({
-            title: "Access Denied",
-            description: "You don't have permission to access this page",
+            title: "Error",
+            description: "Failed to verify admin privileges",
             variant: "destructive",
           });
           navigate("/dashboard");
-          return;
         }
-        
-        setIsAdmin(admin);
-        await fetchData();
       }
     };
     
@@ -82,12 +106,23 @@ const Admin = () => {
 
   const fetchData = async () => {
     setIsLoadingData(true);
-    const fetchedUsers = await fetchAllUsers();
-    const fetchedBalances = await fetchAllBalances();
-    
-    setUsers(fetchedUsers);
-    setBalances(fetchedBalances);
-    setIsLoadingData(false);
+    try {
+      console.log("Fetching admin data...");
+      const fetchedUsers = await fetchAllUsers();
+      const fetchedBalances = await fetchAllBalances();
+      
+      setUsers(fetchedUsers);
+      setBalances(fetchedBalances);
+    } catch (error) {
+      console.error("Error fetching admin data:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load admin data",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingData(false);
+    }
   };
 
   const handleMakeAdmin = async () => {
@@ -125,9 +160,9 @@ const Admin = () => {
 
     setIsSubmitting(true);
     // Ensure all required fields are present in the task
-    const taskData = {
+    const taskData: Omit<Task, "id" | "created_at"> = {
       title: values.title,
-      description: values.description || "",
+      description: values.description || null,
       reward: values.reward,
       difficulty: values.difficulty,
       is_active: values.is_active,

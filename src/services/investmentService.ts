@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 
@@ -69,6 +70,9 @@ export const INVESTMENT_OPPORTUNITIES: InvestmentOpportunity[] = [
 
 export const fetchUserInvestments = async (userId: string): Promise<Investment[]> => {
   try {
+    // Log the userId to help with debugging
+    console.log('Fetching investments for user:', userId);
+    
     const { data, error } = await supabase
       .from('user_investments')
       .select('*')
@@ -103,7 +107,12 @@ export const createInvestment = async (
       .eq('user_id', userId)
       .single();
     
-    if (balanceError || !balanceData) {
+    if (balanceError) {
+      console.error('Error fetching balance:', balanceError);
+      return { success: false, error: 'Could not retrieve your balance' };
+    }
+    
+    if (!balanceData) {
       return { success: false, error: 'Could not retrieve your balance' };
     }
     
@@ -205,6 +214,7 @@ export const sellInvestment = async (investmentId: string, userId: string): Prom
       .single();
     
     if (fetchError || !investment) {
+      console.error('Error fetching investment to sell:', fetchError);
       return { success: false, error: 'Investment not found' };
     }
     
@@ -235,18 +245,19 @@ export const sellInvestment = async (investmentId: string, userId: string): Prom
       return { success: false, error: 'Investment sold but failed to record transaction' };
     }
     
-    // Update user balance
+    // Update user balance - first get the current balance
     const { data: balanceData, error: balanceError } = await supabase
       .from('user_balances')
       .select('balance')
       .eq('user_id', userId)
       .single();
     
-    if (balanceError) {
+    if (balanceError || !balanceData) {
       console.error('Error fetching balance:', balanceError);
       return { success: false, error: 'Investment sold but failed to update balance' };
     }
     
+    // Now update the balance with the investment's current value
     const { error: updateError } = await supabase
       .from('user_balances')
       .update({ 
