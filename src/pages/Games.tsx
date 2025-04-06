@@ -1,5 +1,5 @@
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import DashboardLayout from "@/components/layout/DashboardLayout";
@@ -8,10 +8,20 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dice5, Trophy, MonitorPlay, MessageSquare, Gamepad2, Clock, Users, TrendingUp, Flame } from "lucide-react";
+import { fetchGames, Game, fetchGameHistory, GameSession } from "@/services/gameService";
+import { fetchUserBalance, UserBalance } from "@/services/userService";
+import CoinFlipGame from "@/components/games/CoinFlipGame";
+import DiceRollGame from "@/components/games/DiceRollGame";
+import { format } from "date-fns";
 
 const Games = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
+  const [games, setGames] = useState<Game[]>([]);
+  const [gameHistory, setGameHistory] = useState<GameSession[]>([]);
+  const [userBalance, setUserBalance] = useState<UserBalance | null>(null);
+  const [selectedGame, setSelectedGame] = useState<string | null>(null);
+  const [isLoadingData, setIsLoadingData] = useState<boolean>(true);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -19,13 +29,70 @@ const Games = () => {
     }
   }, [user, loading, navigate]);
 
-  if (loading) {
+  useEffect(() => {
+    if (user) {
+      const loadData = async () => {
+        setIsLoadingData(true);
+        const [gamesData, historyData, balanceData] = await Promise.all([
+          fetchGames(),
+          fetchGameHistory(user.id),
+          fetchUserBalance(user.id)
+        ]);
+        
+        setGames(gamesData);
+        setGameHistory(historyData);
+        setUserBalance(balanceData);
+        setIsLoadingData(false);
+      };
+      
+      loadData();
+    }
+  }, [user]);
+
+  if (loading || isLoadingData) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-earniverse-gold"></div>
       </div>
     );
   }
+
+  const renderGameContent = () => {
+    if (!selectedGame) return null;
+
+    switch (selectedGame) {
+      case "Coin Flip":
+        return <CoinFlipGame />;
+      case "Dice Roll":
+        return <DiceRollGame />;
+      default:
+        return (
+          <div className="text-center py-10">
+            <p>Game coming soon!</p>
+          </div>
+        );
+    }
+  };
+
+  // Calculate wins, losses, and win rate
+  const totalGames = gameHistory.length;
+  const wins = gameHistory.filter(g => g.win_amount && g.win_amount > 0).length;
+  const winRate = totalGames > 0 ? Math.round((wins / totalGames) * 100) : 0;
+  const totalWinnings = gameHistory.reduce((sum, game) => sum + (game.win_amount || 0), 0);
+
+  // Games played today
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const gamesPlayedToday = gameHistory.filter(
+    game => new Date(game.played_at) >= today
+  ).length;
+
+  // Winnings today
+  const winningsToday = gameHistory
+    .filter(game => new Date(game.played_at) >= today && game.win_amount && game.win_amount > 0)
+    .reduce((sum, game) => sum + (game.win_amount || 0), 0);
+  
+  const winRateChange = "+3"; // This would normally be calculated based on historical data
 
   return (
     <DashboardLayout>
@@ -42,7 +109,7 @@ const Games = () => {
             </Button>
             <Button className="bg-earniverse-gold hover:bg-earniverse-royal-gold text-black gap-2">
               <Wallet />
-              Balance: $325.50
+              Balance: ${userBalance?.balance.toFixed(2) || '0.00'}
             </Button>
           </div>
         </div>
@@ -56,10 +123,10 @@ const Games = () => {
                 </div>
                 <div>
                   <p className="text-muted-foreground text-sm">Winnings</p>
-                  <p className="text-2xl font-bold">$1,245.82</p>
+                  <p className="text-2xl font-bold">${totalWinnings.toFixed(2)}</p>
                 </div>
               </div>
-              <div className="text-green-600 bg-green-100 px-2 py-1 rounded text-xs">+$42.50 today</div>
+              <div className="text-green-600 bg-green-100 px-2 py-1 rounded text-xs">+${winningsToday.toFixed(2)} today</div>
             </CardContent>
           </Card>
           
@@ -71,10 +138,10 @@ const Games = () => {
                 </div>
                 <div>
                   <p className="text-muted-foreground text-sm">Games Played</p>
-                  <p className="text-2xl font-bold">347</p>
+                  <p className="text-2xl font-bold">{totalGames}</p>
                 </div>
               </div>
-              <div className="text-purple-600 bg-purple-100 px-2 py-1 rounded text-xs">12 today</div>
+              <div className="text-purple-600 bg-purple-100 px-2 py-1 rounded text-xs">{gamesPlayedToday} today</div>
             </CardContent>
           </Card>
           
@@ -86,10 +153,10 @@ const Games = () => {
                 </div>
                 <div>
                   <p className="text-muted-foreground text-sm">Win Rate</p>
-                  <p className="text-2xl font-bold">62%</p>
+                  <p className="text-2xl font-bold">{winRate}%</p>
                 </div>
               </div>
-              <div className="text-green-600 bg-green-100 px-2 py-1 rounded text-xs">+3% this week</div>
+              <div className="text-green-600 bg-green-100 px-2 py-1 rounded text-xs">{winRateChange}% this week</div>
             </CardContent>
           </Card>
         </div>
@@ -98,66 +165,42 @@ const Games = () => {
           <TabsList className="mb-4">
             <TabsTrigger value="casino">Casino</TabsTrigger>
             <TabsTrigger value="sports">Sports Betting</TabsTrigger>
-            <TabsTrigger value="tournaments">Tournaments</TabsTrigger>
+            <TabsTrigger value="history">History</TabsTrigger>
           </TabsList>
           
           <TabsContent value="casino">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              <GameCard 
-                title="Premium Blackjack"
-                category="Card Game"
-                icon={<Dice5 size={24} />}
-                players="1,248"
-                minBet="$1"
-                bgClass="bg-gradient-to-br from-earniverse-blue to-earniverse-navy"
-                isHot={true}
-              />
-              <GameCard 
-                title="Golden Fortune Slots"
-                category="Slots"
-                icon={<MonitorPlay size={24} />}
-                players="967"
-                minBet="$0.50"
-                bgClass="bg-gradient-to-br from-earniverse-gold to-earniverse-royal-gold"
-                isHot={false}
-              />
-              <GameCard 
-                title="High Stakes Poker"
-                category="Card Game"
-                icon={<MessageSquare size={24} />}
-                players="512"
-                minBet="$5"
-                bgClass="bg-gradient-to-br from-slate-700 to-slate-900"
-                isHot={true}
-              />
-              <GameCard 
-                title="Lucky Roulette"
-                category="Table Game"
-                icon={<Dice5 size={24} />}
-                players="845"
-                minBet="$1"
-                bgClass="bg-gradient-to-br from-red-600 to-red-900"
-                isHot={false}
-              />
-              <GameCard 
-                title="Dragon's Treasure"
-                category="Slots"
-                icon={<MonitorPlay size={24} />}
-                players="723"
-                minBet="$0.25"
-                bgClass="bg-gradient-to-br from-emerald-600 to-emerald-900"
-                isHot={false}
-              />
-              <GameCard 
-                title="Video Poker Deluxe"
-                category="Card Game"
-                icon={<MessageSquare size={24} />}
-                players="491"
-                minBet="$2"
-                bgClass="bg-gradient-to-br from-amber-600 to-amber-900"
-                isHot={false}
-              />
-            </div>
+            {selectedGame ? (
+              <div className="mb-6">
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-xl font-bold flex items-center gap-2">
+                    <Button 
+                      variant="ghost" 
+                      className="p-2" 
+                      onClick={() => setSelectedGame(null)}
+                    >
+                      ← Back
+                    </Button>
+                    {selectedGame}
+                  </h2>
+                </div>
+                {renderGameContent()}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {games.map((game) => (
+                  <GameCard 
+                    key={game.id}
+                    title={game.name}
+                    category={game.description || "Casino Game"}
+                    icon={getGameIcon(game.name)}
+                    minBet={`$${game.min_bet}`}
+                    bgClass={getGameBackground(game.name)}
+                    isHot={game.name === "Coin Flip" || game.name === "Dice Roll"}
+                    onClick={() => setSelectedGame(game.name)}
+                  />
+                ))}
+              </div>
+            )}
           </TabsContent>
           
           <TabsContent value="sports">
@@ -215,48 +258,102 @@ const Games = () => {
             </div>
           </TabsContent>
           
-          <TabsContent value="tournaments">
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <TournamentCard 
-                  title="Blackjack Masters"
-                  prize="$10,000"
-                  entryFee="$50"
-                  players="128/256"
-                  startDate="April 10, 2025"
-                  status="Open"
-                />
-                <TournamentCard 
-                  title="Poker Championship"
-                  prize="$25,000"
-                  entryFee="$100"
-                  players="64/128"
-                  startDate="April 15, 2025"
-                  status="Open"
-                />
-                <TournamentCard 
-                  title="Slots Showdown"
-                  prize="$5,000"
-                  entryFee="$25"
-                  players="512/512"
-                  startDate="Ongoing"
-                  status="Full"
-                />
-                <TournamentCard 
-                  title="Sports Prediction Cup"
-                  prize="$15,000"
-                  entryFee="$75"
-                  players="256/500"
-                  startDate="April 8, 2025"
-                  status="Open"
-                />
-              </div>
-            </div>
+          <TabsContent value="history">
+            <Card>
+              <CardHeader>
+                <CardTitle>Game History</CardTitle>
+                <CardDescription>Your recent game sessions</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {gameHistory.length > 0 ? (
+                  <div className="rounded-md border overflow-hidden">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Game</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bet Amount</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Outcome</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Win Amount</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {gameHistory.map((session) => {
+                          const gameInfo = games.find(g => g.id === session.game_id);
+                          const isWin = session.win_amount && session.win_amount > 0;
+                          
+                          return (
+                            <tr key={session.id}>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                {gameInfo?.name || session.game_id.slice(0, 8)}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {format(new Date(session.played_at), "MMM d, yyyy h:mm a")}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                ${session.bet_amount.toFixed(2)}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${isWin ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                  {session.outcome}
+                                </span>
+                              </td>
+                              <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${isWin ? 'text-green-600' : 'text-red-600'}`}>
+                                {isWin ? `$${session.win_amount?.toFixed(2)}` : '-'}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="text-center py-10 text-muted-foreground">
+                    You haven't played any games yet
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       </div>
     </DashboardLayout>
   );
+};
+
+// Helper functions for game icons and backgrounds
+const getGameIcon = (gameName: string) => {
+  switch (gameName) {
+    case "Coin Flip":
+      return <Dice5 size={24} />;
+    case "Dice Roll":
+      return <Dice5 size={24} />;
+    case "Slot Machine":
+      return <MonitorPlay size={24} />;
+    case "Roulette":
+      return <Dice5 size={24} />;
+    case "Blackjack":
+      return <MessageSquare size={24} />;
+    default:
+      return <Gamepad2 size={24} />;
+  }
+};
+
+const getGameBackground = (gameName: string) => {
+  switch (gameName) {
+    case "Coin Flip":
+      return "bg-gradient-to-br from-yellow-500 to-amber-700";
+    case "Dice Roll":
+      return "bg-gradient-to-br from-purple-600 to-purple-900";
+    case "Slot Machine":
+      return "bg-gradient-to-br from-earniverse-gold to-earniverse-royal-gold";
+    case "Roulette":
+      return "bg-gradient-to-br from-red-600 to-red-900";
+    case "Blackjack":
+      return "bg-gradient-to-br from-slate-700 to-slate-900";
+    default:
+      return "bg-gradient-to-br from-earniverse-blue to-earniverse-navy";
+  }
 };
 
 const Wallet = () => (
@@ -281,15 +378,15 @@ interface GameCardProps {
   title: string;
   category: string;
   icon: React.ReactNode;
-  players: string;
   minBet: string;
   bgClass: string;
   isHot: boolean;
+  onClick: () => void;
 }
 
-const GameCard = ({ title, category, icon, players, minBet, bgClass, isHot }: GameCardProps) => {
+const GameCard = ({ title, category, icon, minBet, bgClass, isHot, onClick }: GameCardProps) => {
   return (
-    <Card className="overflow-hidden h-48 group cursor-pointer hover:shadow-xl transition-all">
+    <Card className="overflow-hidden h-48 group cursor-pointer hover:shadow-xl transition-all" onClick={onClick}>
       <div className={`${bgClass} h-full w-full p-6 text-white flex flex-col justify-between relative overflow-hidden`}>
         <div className="absolute top-0 right-0 p-4 opacity-25 group-hover:opacity-40 transition-opacity">
           {icon}
@@ -308,23 +405,18 @@ const GameCard = ({ title, category, icon, players, minBet, bgClass, isHot }: Ga
         </div>
         
         <div className="flex items-center justify-between">
-          <span className="flex items-center text-xs text-white/70">
-            <Users size={12} className="mr-1" />
-            {players} playing
-          </span>
-          <div className="flex flex-col items-end">
+          <div className="flex flex-col items-start">
             <span className="text-xs text-white/70">Min bet</span>
             <span className="text-sm font-bold">{minBet}</span>
           </div>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="border-white/30 text-white hover:bg-white/20 backdrop-blur-sm"
+          >
+            Play Now
+          </Button>
         </div>
-        
-        <Button 
-          variant="outline" 
-          size="sm" 
-          className="absolute bottom-6 left-1/2 transform -translate-x-1/2 border-white/30 text-white hover:bg-white/20 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity"
-        >
-          Play Now
-        </Button>
       </div>
     </Card>
   );

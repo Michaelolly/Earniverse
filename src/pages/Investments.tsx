@@ -1,18 +1,39 @@
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ArrowUpRight, BarChart2, Percent, Clock, AlertCircle } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { toast } from "@/hooks/use-toast";
+import { 
+  fetchUserInvestments, 
+  createInvestment, 
+  updateInvestment, 
+  sellInvestment,
+  Investment,
+  INVESTMENT_OPPORTUNITIES 
+} from "@/services/investmentService";
+import { fetchUserBalance } from "@/services/userService";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { format } from "date-fns";
 
 const Investments = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
+  const [investments, setInvestments] = useState<Investment[]>([]);
+  const [balance, setBalance] = useState<number>(0);
+  const [isLoadingData, setIsLoadingData] = useState<boolean>(true);
+  const [selectedOpportunity, setSelectedOpportunity] = useState<any>(null);
+  const [investmentAmount, setInvestmentAmount] = useState<number>(0);
+  const [isInvesting, setIsInvesting] = useState<boolean>(false);
+  const [dialogOpen, setDialogOpen] = useState<boolean>(false);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -20,13 +41,179 @@ const Investments = () => {
     }
   }, [user, loading, navigate]);
 
-  if (loading) {
+  useEffect(() => {
+    if (user) {
+      const loadData = async () => {
+        setIsLoadingData(true);
+        try {
+          const [userInvestments, userBalance] = await Promise.all([
+            fetchUserInvestments(user.id),
+            fetchUserBalance(user.id)
+          ]);
+          
+          setInvestments(userInvestments);
+          setBalance(userBalance?.balance || 0);
+        } catch (error) {
+          console.error("Error loading investment data:", error);
+          toast({
+            title: "Error",
+            description: "Failed to load investment data",
+            variant: "destructive",
+          });
+        } finally {
+          setIsLoadingData(false);
+        }
+      };
+      
+      loadData();
+    }
+  }, [user]);
+
+  const handleInvestmentSelect = (opportunity: any) => {
+    setSelectedOpportunity(opportunity);
+    setInvestmentAmount(opportunity.min_investment);
+    setDialogOpen(true);
+  };
+
+  const handleInvest = async () => {
+    if (!user || !selectedOpportunity) return;
+    
+    if (balance < investmentAmount) {
+      toast({
+        title: "Insufficient Balance",
+        description: "You don't have enough funds for this investment",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (investmentAmount < selectedOpportunity.min_investment) {
+      toast({
+        title: "Invalid Amount",
+        description: `Minimum investment is $${selectedOpportunity.min_investment}`,
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setIsInvesting(true);
+    
+    try {
+      // Generate a random performance between min and max potential return
+      const performanceFactor = (Math.random() * (selectedOpportunity.potential_return_max - selectedOpportunity.potential_return_min) + selectedOpportunity.potential_return_min) / 100;
+      const currentValue = investmentAmount * (1 + performanceFactor);
+      
+      const result = await createInvestment(user.id, {
+        name: selectedOpportunity.name,
+        category: selectedOpportunity.category,
+        amount_invested: investmentAmount,
+        current_value: currentValue,
+        purchase_date: new Date().toISOString()
+      });
+      
+      if (result.success) {
+        toast({
+          title: "Investment Created",
+          description: `You have successfully invested $${investmentAmount} in ${selectedOpportunity.name}`,
+        });
+        
+        setDialogOpen(false);
+        
+        // Refresh data
+        const [userInvestments, userBalance] = await Promise.all([
+          fetchUserInvestments(user.id),
+          fetchUserBalance(user.id)
+        ]);
+        
+        setInvestments(userInvestments);
+        setBalance(userBalance?.balance || 0);
+      } else {
+        toast({
+          title: "Investment Failed",
+          description: result.error || "An error occurred while creating your investment",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Error creating investment:", error);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred",
+        variant: "destructive",
+      });
+    } finally {
+      setIsInvesting(false);
+    }
+  };
+
+  const handleSellInvestment = async (investmentId: string) => {
+    if (!user) return;
+    
+    try {
+      const result = await sellInvestment(investmentId, user.id);
+      
+      if (result.success) {
+        toast({
+          title: "Investment Sold",
+          description: "Your investment has been sold successfully",
+        });
+        
+        // Refresh data
+        const [userInvestments, userBalance] = await Promise.all([
+          fetchUserInvestments(user.id),
+          fetchUserBalance(user.id)
+        ]);
+        
+        setInvestments(userInvestments);
+        setBalance(userBalance?.balance || 0);
+      } else {
+        toast({
+          title: "Sale Failed",
+          description: result.error || "An error occurred while selling your investment",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Error selling investment:", error);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred",
+        variant: "destructive",
+      });
+    }
+  };
+
+  if (loading || isLoadingData) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-earniverse-purple"></div>
       </div>
     );
   }
+
+  // Calculate total investment value and allocation percentages
+  const totalValue = investments.reduce((sum, inv) => sum + inv.current_value, 0);
+  const totalInvested = investments.reduce((sum, inv) => sum + inv.amount_invested, 0);
+  const profit = totalValue - totalInvested;
+  const profitPercentage = totalInvested > 0 ? (profit / totalInvested) * 100 : 0;
+  
+  // Calculate allocation for pie chart
+  const categories: Record<string, number> = {};
+  investments.forEach(inv => {
+    if (categories[inv.category]) {
+      categories[inv.category] += inv.current_value;
+    } else {
+      categories[inv.category] = inv.current_value;
+    }
+  });
+  
+  const categoryPercentages = Object.entries(categories).map(([category, value]) => ({
+    category,
+    percentage: (value / totalValue) * 100
+  }));
+  
+  // Sort investments by current value
+  const sortedInvestments = [...investments].sort((a, b) => b.current_value - a.current_value);
 
   return (
     <DashboardLayout>
@@ -51,12 +238,12 @@ const Investments = () => {
                 </div>
                 <div>
                   <p className="text-muted-foreground text-sm">Portfolio Value</p>
-                  <p className="text-2xl font-bold">$8,459.32</p>
+                  <p className="text-2xl font-bold">${totalValue.toFixed(2)}</p>
                 </div>
               </div>
-              <div className="text-green-600 flex items-center text-sm">
-                <ArrowUpRight size={16} className="mr-1" />
-                12.5%
+              <div className={`flex items-center text-sm ${profitPercentage >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                <ArrowUpRight size={16} className={`mr-1 ${profitPercentage < 0 && 'rotate-180'}`} />
+                {profitPercentage.toFixed(1)}%
               </div>
             </CardContent>
           </Card>
@@ -69,12 +256,12 @@ const Investments = () => {
                 </div>
                 <div>
                   <p className="text-muted-foreground text-sm">Current Returns</p>
-                  <p className="text-2xl font-bold">+$952.45</p>
+                  <p className="text-2xl font-bold">{profit >= 0 ? '+' : ''}{profit.toFixed(2)}</p>
                 </div>
               </div>
-              <div className="text-green-600 flex items-center text-sm">
-                <ArrowUpRight size={16} className="mr-1" />
-                8.2%
+              <div className={`flex items-center text-sm ${profitPercentage >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                <ArrowUpRight size={16} className={`mr-1 ${profitPercentage < 0 && 'rotate-180'}`} />
+                {profitPercentage.toFixed(1)}%
               </div>
             </CardContent>
           </Card>
@@ -87,10 +274,12 @@ const Investments = () => {
                 </div>
                 <div>
                   <p className="text-muted-foreground text-sm">Active Investments</p>
-                  <p className="text-2xl font-bold">5</p>
+                  <p className="text-2xl font-bold">{investments.length}</p>
                 </div>
               </div>
-              <div className="text-blue-600 bg-blue-100 px-2 py-1 rounded text-xs">Diversified</div>
+              <div className="text-blue-600 bg-blue-100 px-2 py-1 rounded text-xs">
+                {investments.length > 0 ? 'Diversified' : 'No investments'}
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -110,97 +299,74 @@ const Investments = () => {
                   <CardDescription>Current allocation and performance</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-6">
-                    <div>
-                      <h4 className="text-sm font-medium mb-2">Asset Allocation</h4>
-                      <div className="flex gap-1 h-4">
-                        <div className="bg-earniverse-blue w-[45%] rounded-l-full" title="Stocks: 45%"></div>
-                        <div className="bg-earniverse-purple w-[30%]" title="Crypto: 30%"></div>
-                        <div className="bg-earniverse-gold w-[15%]" title="ETFs: 15%"></div>
-                        <div className="bg-earniverse-navy w-[10%] rounded-r-full" title="Bonds: 10%"></div>
+                  {investments.length > 0 ? (
+                    <div className="space-y-6">
+                      <div>
+                        <h4 className="text-sm font-medium mb-2">Asset Allocation</h4>
+                        <div className="flex gap-1 h-4">
+                          {categoryPercentages.map((cat, index) => (
+                            <div 
+                              key={cat.category}
+                              className={`bg-${getCategoryColor(cat.category)} ${index === 0 ? 'rounded-l-full' : ''} ${index === categoryPercentages.length - 1 ? 'rounded-r-full' : ''}`} 
+                              style={{ width: `${cat.percentage}%` }}
+                              title={`${cat.category}: ${cat.percentage.toFixed(0)}%`}
+                            ></div>
+                          ))}
+                        </div>
+                        <div className="flex justify-between text-xs mt-2 text-muted-foreground">
+                          {categoryPercentages.map(cat => (
+                            <span key={cat.category}>{cat.category}: {cat.percentage.toFixed(0)}%</span>
+                          ))}
+                        </div>
                       </div>
-                      <div className="flex justify-between text-xs mt-2 text-muted-foreground">
-                        <span>Stocks: 45%</span>
-                        <span>Crypto: 30%</span>
-                        <span>ETFs: 15%</span>
-                        <span>Bonds: 10%</span>
+                      
+                      <div className="space-y-4 mt-6">
+                        {sortedInvestments.map(inv => {
+                          const profit = inv.current_value - inv.amount_invested;
+                          const percentChange = (profit / inv.amount_invested) * 100;
+                          return (
+                            <InvestmentItem 
+                              key={inv.id}
+                              id={inv.id}
+                              name={inv.name} 
+                              category={inv.category}
+                              allocated={`$${inv.amount_invested.toFixed(2)}`}
+                              value={`$${inv.current_value.toFixed(2)}`}
+                              change={`${percentChange >= 0 ? '+' : ''}${percentChange.toFixed(1)}%`} 
+                              isPositive={percentChange >= 0}
+                              onManage={() => handleSellInvestment(inv.id)}
+                            />
+                          );
+                        })}
                       </div>
                     </div>
-                    
-                    <div className="space-y-4 mt-6">
-                      <InvestmentItem 
-                        name="Tech Growth ETF" 
-                        category="ETF"
-                        allocated="$3,806.69"
-                        value="$4,020.86"
-                        change="+5.6%" 
-                        isPositive={true}
-                      />
-                      <InvestmentItem 
-                        name="Bitcoin (BTC)" 
-                        category="Crypto"
-                        allocated="$2,280.00"
-                        value="$2,560.44"
-                        change="+12.3%" 
-                        isPositive={true}
-                      />
-                      <InvestmentItem 
-                        name="Green Energy Fund" 
-                        category="Stock"
-                        allocated="$1,200.55"
-                        value="$1,174.74"
-                        change="-2.1%" 
-                        isPositive={false}
-                      />
-                      <InvestmentItem 
-                        name="Corporate Bonds" 
-                        category="Bond"
-                        allocated="$800.00"
-                        value="$806.40"
-                        change="+0.8%" 
-                        isPositive={true}
-                      />
+                  ) : (
+                    <div className="py-10 text-center">
+                      <p className="text-muted-foreground mb-4">You don't have any investments yet</p>
+                      <Button onClick={() => document.getElementById('opportunities-tab')?.click()}>
+                        Explore Opportunities
+                      </Button>
                     </div>
-                  </div>
+                  )}
                 </CardContent>
               </Card>
             </div>
           </TabsContent>
           
-          <TabsContent value="opportunities">
+          <TabsContent value="opportunities" id="opportunities-tab">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <OpportunityCard
-                title="High Yield Tech Fund"
-                description="A diversified fund focused on high-growth technology companies"
-                riskLevel="Medium"
-                potentialReturn="12-18%"
-                minInvestment="$500"
-                category="ETF"
-              />
-              <OpportunityCard
-                title="Green Energy Portfolio"
-                description="Invest in renewable energy companies with strong ESG ratings"
-                riskLevel="Medium"
-                potentialReturn="9-14%"
-                minInvestment="$250"
-                category="Stock"
-              />
-              <OpportunityCard
-                title="Real Estate Investment Trust"
-                description="Commercial and residential property investments with regular dividends"
-                riskLevel="Low"
-                potentialReturn="6-10%"
-                minInvestment="$1,000"
-                category="REIT"
-              />
-              <OpportunityCard
-                title="Cryptocurrency Index"
-                description="Diversified exposure to top performing cryptocurrencies"
-                riskLevel="High"
-                potentialReturn="15-30%"
-                minInvestment="$100"
-                category="Crypto"
-              />
+              {INVESTMENT_OPPORTUNITIES.map(opportunity => (
+                <OpportunityCard
+                  key={opportunity.id}
+                  title={opportunity.name}
+                  description={opportunity.description}
+                  riskLevel={opportunity.risk_level}
+                  potentialReturn={`${opportunity.potential_return_min}-${opportunity.potential_return_max}%`}
+                  minInvestment={`$${opportunity.min_investment}`}
+                  category={opportunity.category}
+                  onInvest={() => handleInvestmentSelect(opportunity)}
+                />
+              ))}
             </div>
           </TabsContent>
           
@@ -211,54 +377,127 @@ const Investments = () => {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  <TransactionItem
-                    type="Buy"
-                    asset="Tech Growth ETF"
-                    amount="$1,000.00"
-                    date="Apr 02, 2025"
-                    status="Completed"
-                  />
-                  <TransactionItem
-                    type="Sell"
-                    asset="Silver Fund"
-                    amount="$550.75"
-                    date="Mar 28, 2025"
-                    status="Completed"
-                  />
-                  <TransactionItem
-                    type="Buy"
-                    asset="Bitcoin (BTC)"
-                    amount="$800.00"
-                    date="Mar 22, 2025"
-                    status="Completed"
-                  />
-                  <TransactionItem
-                    type="Buy"
-                    asset="Corporate Bonds"
-                    amount="$2,000.00"
-                    date="Mar 15, 2025"
-                    status="Completed"
-                  />
+                  {investments.map(inv => (
+                    <TransactionItem
+                      key={inv.id}
+                      type="Buy"
+                      asset={inv.name}
+                      amount={`$${inv.amount_invested.toFixed(2)}`}
+                      date={format(new Date(inv.purchase_date), "MMM dd, yyyy")}
+                      status="Completed"
+                    />
+                  ))}
+                  
+                  {investments.length === 0 && (
+                    <div className="py-10 text-center">
+                      <p className="text-muted-foreground">No transaction history available</p>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
           </TabsContent>
         </Tabs>
       </div>
+
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Invest in {selectedOpportunity?.name}</DialogTitle>
+            <DialogDescription>
+              Enter the amount you want to invest. Minimum: ${selectedOpportunity?.min_investment}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="investment-amount">Investment Amount</Label>
+              <Input
+                id="investment-amount"
+                type="number"
+                min={selectedOpportunity?.min_investment || 0}
+                step={1}
+                value={investmentAmount}
+                onChange={(e) => setInvestmentAmount(Number(e.target.value))}
+              />
+              <p className="text-xs text-muted-foreground">
+                Available Balance: ${balance.toFixed(2)}
+              </p>
+            </div>
+            
+            <div className="space-y-1">
+              <div className="flex justify-between text-sm">
+                <span>Category:</span>
+                <span className="font-medium">{selectedOpportunity?.category}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span>Risk Level:</span>
+                <span className="font-medium">{selectedOpportunity?.risk_level}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span>Potential Return:</span>
+                <span className="font-medium">{selectedOpportunity?.potential_return_min}-{selectedOpportunity?.potential_return_max}%</span>
+              </div>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleInvest} 
+              disabled={isInvesting || investmentAmount < (selectedOpportunity?.min_investment || 0) || investmentAmount > balance}
+            >
+              {isInvesting ? "Processing..." : "Confirm Investment"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 };
 
+// Helper function to get category colors
+const getCategoryColor = (category: string) => {
+  switch (category.toLowerCase()) {
+    case 'stock':
+      return 'earniverse-blue';
+    case 'crypto':
+      return 'earniverse-purple';
+    case 'etf':
+      return 'earniverse-gold';
+    case 'bond':
+    case 'bonds':
+      return 'earniverse-navy';
+    case 'reit':
+      return 'green-600';
+    default:
+      return 'gray-400';
+  }
+};
+
 interface InvestmentItemProps {
+  id: string;
   name: string;
   category: string;
   allocated: string;
   value: string;
   change: string;
   isPositive: boolean;
+  onManage: () => void;
 }
 
-const InvestmentItem = ({ name, category, allocated, value, change, isPositive }: InvestmentItemProps) => {
+const InvestmentItem = ({ 
+  id, 
+  name, 
+  category, 
+  allocated, 
+  value, 
+  change, 
+  isPositive,
+  onManage 
+}: InvestmentItemProps) => {
   return (
     <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
       <div className="space-y-1">
@@ -276,8 +515,12 @@ const InvestmentItem = ({ name, category, allocated, value, change, isPositive }
           {isPositive ? <ArrowUpRight size={16} className="mr-1" /> : <ArrowUpRight size={16} className="mr-1 rotate-180" />}
           {change}
         </span>
-        <Button variant="outline" className="border-earniverse-purple text-earniverse-purple hover:text-earniverse-purple hover:bg-earniverse-purple/10">
-          Manage
+        <Button 
+          variant="outline" 
+          className="border-earniverse-purple text-earniverse-purple hover:text-earniverse-purple hover:bg-earniverse-purple/10"
+          onClick={onManage}
+        >
+          Sell
         </Button>
       </div>
     </div>
@@ -291,6 +534,7 @@ interface OpportunityCardProps {
   potentialReturn: string;
   minInvestment: string;
   category: string;
+  onInvest: () => void;
 }
 
 const OpportunityCard = ({ 
@@ -299,7 +543,8 @@ const OpportunityCard = ({
   riskLevel, 
   potentialReturn, 
   minInvestment,
-  category
+  category,
+  onInvest
 }: OpportunityCardProps) => {
   const getRiskColor = (risk: string) => {
     if (risk === "Low") return "bg-green-100 text-green-800";
@@ -337,7 +582,12 @@ const OpportunityCard = ({
             <p className="font-medium">1,234</p>
           </div>
         </div>
-        <Button className="w-full bg-earniverse-purple hover:bg-earniverse-deep-purple">Invest Now</Button>
+        <Button 
+          className="w-full bg-earniverse-purple hover:bg-earniverse-deep-purple"
+          onClick={onInvest}
+        >
+          Invest Now
+        </Button>
       </CardContent>
     </Card>
   );

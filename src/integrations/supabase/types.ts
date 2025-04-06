@@ -9,13 +9,276 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      game_sessions: {
+        Row: {
+          bet_amount: number
+          game_id: string
+          id: string
+          outcome: string
+          played_at: string
+          user_id: string
+          win_amount: number | null
+        }
+        Insert: {
+          bet_amount: number
+          game_id: string
+          id?: string
+          outcome: string
+          played_at?: string
+          user_id: string
+          win_amount?: number | null
+        }
+        Update: {
+          bet_amount?: number
+          game_id?: string
+          id?: string
+          outcome?: string
+          played_at?: string
+          user_id?: string
+          win_amount?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "game_sessions_game_id_fkey"
+            columns: ["game_id"]
+            isOneToOne: false
+            referencedRelation: "games"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      games: {
+        Row: {
+          active: boolean
+          created_at: string
+          description: string | null
+          house_edge: number
+          id: string
+          image_url: string | null
+          max_bet: number
+          min_bet: number
+          name: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          description?: string | null
+          house_edge?: number
+          id?: string
+          image_url?: string | null
+          max_bet?: number
+          min_bet?: number
+          name: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          description?: string | null
+          house_edge?: number
+          id?: string
+          image_url?: string | null
+          max_bet?: number
+          min_bet?: number
+          name?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          id: string
+          role: string
+          updated_at: string
+          username: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          id: string
+          role?: string
+          updated_at?: string
+          username?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          id?: string
+          role?: string
+          updated_at?: string
+          username?: string | null
+        }
+        Relationships: []
+      }
+      tasks: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          difficulty: string
+          expiration_date: string | null
+          id: string
+          is_active: boolean | null
+          reward: number
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          difficulty: string
+          expiration_date?: string | null
+          id?: string
+          is_active?: boolean | null
+          reward: number
+          title: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          difficulty?: string
+          expiration_date?: string | null
+          id?: string
+          is_active?: boolean | null
+          reward?: number
+          title?: string
+        }
+        Relationships: []
+      }
+      transactions: {
+        Row: {
+          amount: number
+          created_at: string
+          description: string | null
+          id: string
+          reference_id: string | null
+          type: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          reference_id?: string | null
+          type: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          reference_id?: string | null
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_balances: {
+        Row: {
+          balance: number
+          id: string
+          total_losses: number | null
+          total_winnings: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          balance?: number
+          id?: string
+          total_losses?: number | null
+          total_winnings?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          balance?: number
+          id?: string
+          total_losses?: number | null
+          total_winnings?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_investments: {
+        Row: {
+          amount_invested: number
+          category: string
+          current_value: number
+          id: string
+          last_updated: string
+          name: string
+          purchase_date: string
+          user_id: string
+        }
+        Insert: {
+          amount_invested: number
+          category: string
+          current_value: number
+          id?: string
+          last_updated?: string
+          name: string
+          purchase_date?: string
+          user_id: string
+        }
+        Update: {
+          amount_invested?: number
+          category?: string
+          current_value?: number
+          id?: string
+          last_updated?: string
+          name?: string
+          purchase_date?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_tasks: {
+        Row: {
+          completed_at: string | null
+          id: string
+          status: string
+          task_id: string
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          id?: string
+          status?: string
+          task_id: string
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          id?: string
+          status?: string
+          task_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_tasks_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      make_user_admin: {
+        Args: {
+          user_email: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never

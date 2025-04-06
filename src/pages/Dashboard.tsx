@@ -1,14 +1,24 @@
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowUpRight, TrendingUp, Users, Wallet, BarChart2, Calendar } from "lucide-react";
+import { fetchUserBalance, fetchUserTransactions } from "@/services/userService";
+import { fetchUserInvestments, Investment } from "@/services/investmentService";
+import { fetchTasks, Task, fetchUserTasks, UserTask } from "@/services/taskService";
+import { Button } from "@/components/ui/button";
+import { toast } from "@/hooks/use-toast";
 
 const Dashboard = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
+  const [balance, setBalance] = useState<number | null>(null);
+  const [investments, setInvestments] = useState<Investment[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [userTasks, setUserTasks] = useState<UserTask[]>([]);
+  const [isLoadingData, setIsLoadingData] = useState<boolean>(true);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -16,13 +26,58 @@ const Dashboard = () => {
     }
   }, [user, loading, navigate]);
 
-  if (loading) {
+  useEffect(() => {
+    if (user) {
+      const fetchDashboardData = async () => {
+        setIsLoadingData(true);
+        try {
+          // Fetch user data in parallel
+          const [balanceData, investmentsData, tasksData, userTasksData] = await Promise.all([
+            fetchUserBalance(user.id),
+            fetchUserInvestments(user.id),
+            fetchTasks(),
+            fetchUserTasks(user.id)
+          ]);
+          
+          setBalance(balanceData?.balance || 0);
+          setInvestments(investmentsData);
+          setTasks(tasksData);
+          setUserTasks(userTasksData);
+        } catch (error) {
+          console.error("Error fetching dashboard data:", error);
+          toast({
+            title: "Error",
+            description: "Failed to load dashboard data",
+            variant: "destructive",
+          });
+        } finally {
+          setIsLoadingData(false);
+        }
+      };
+      
+      fetchDashboardData();
+    }
+  }, [user]);
+
+  if (loading || isLoadingData) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-earniverse-gold"></div>
       </div>
     );
   }
+
+  // Calculate total investment value
+  const totalInvestmentValue = investments.reduce((sum, inv) => sum + inv.current_value, 0);
+  const totalInvested = investments.reduce((sum, inv) => sum + inv.amount_invested, 0);
+  const investmentChange = totalInvested > 0 
+    ? ((totalInvestmentValue - totalInvested) / totalInvested) * 100 
+    : 0;
+  
+  // Get pending tasks
+  const pendingTasks = tasks.filter(task => 
+    !userTasks.some(ut => ut.task_id === task.id && ut.status === 'completed')
+  );
 
   return (
     <DashboardLayout>
@@ -32,29 +87,29 @@ const Dashboard = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <StatsCard 
             title="Total Balance" 
-            value="$8,459.32" 
+            value={`$${balance?.toFixed(2)}`} 
             change="+12.5%" 
             icon={<Wallet className="text-earniverse-gold" />} 
             isPositive={true}
           />
           <StatsCard 
             title="Active Investments" 
-            value="5" 
-            change="+2" 
+            value={investments.length.toString()} 
+            change={investments.length > 0 ? `$${totalInvestmentValue.toFixed(2)}` : "No investments"} 
             icon={<BarChart2 className="text-earniverse-purple" />} 
-            isPositive={true}
+            isPositive={investmentChange >= 0}
           />
           <StatsCard 
             title="Pending Tasks" 
-            value="12" 
-            change="-3" 
+            value={pendingTasks.length.toString()} 
+            change={pendingTasks.length > 0 ? "Rewards available" : "All tasks complete"} 
             icon={<Calendar className="text-earniverse-blue" />} 
-            isPositive={true}
+            isPositive={pendingTasks.length > 0}
           />
           <StatsCard 
             title="Referrals" 
-            value="8" 
-            change="+3" 
+            value="0" 
+            change="Invite friends" 
             icon={<Users className="text-green-500" />} 
             isPositive={true}
           />
@@ -65,41 +120,34 @@ const Dashboard = () => {
             <CardHeader>
               <CardTitle className="text-lg flex items-center justify-between">
                 Portfolio Summary
-                <TrendingUp className="text-green-500" size={20} />
+                <TrendingUp className={investmentChange >= 0 ? "text-green-500" : "text-red-500"} size={20} />
               </CardTitle>
               <CardDescription>Performance of your active investments</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                <PortfolioItem 
-                  name="Tech Growth ETF" 
-                  allocation="35%" 
-                  value="$2,960.76" 
-                  change="+5.6%" 
-                  isPositive={true}
-                />
-                <PortfolioItem 
-                  name="Bitcoin (BTC)" 
-                  allocation="25%" 
-                  value="$2,114.83" 
-                  change="+12.3%" 
-                  isPositive={true}
-                />
-                <PortfolioItem 
-                  name="Green Energy Fund" 
-                  allocation="20%" 
-                  value="$1,691.86" 
-                  change="-2.1%" 
-                  isPositive={false}
-                />
-                <PortfolioItem 
-                  name="Corporate Bonds" 
-                  allocation="20%" 
-                  value="$1,691.86" 
-                  change="+0.8%" 
-                  isPositive={true}
-                />
-              </div>
+              {investments.length > 0 ? (
+                <div className="space-y-4">
+                  {investments.map(investment => {
+                    const profit = investment.current_value - investment.amount_invested;
+                    const percentChange = (profit / investment.amount_invested) * 100;
+                    return (
+                      <PortfolioItem 
+                        key={investment.id}
+                        name={investment.name} 
+                        allocation={`${Math.round((investment.amount_invested / totalInvested) * 100)}%`} 
+                        value={`$${investment.current_value.toFixed(2)}`} 
+                        change={`${percentChange >= 0 ? '+' : ''}${percentChange.toFixed(1)}%`} 
+                        isPositive={percentChange >= 0}
+                      />
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="py-10 text-center">
+                  <p className="text-muted-foreground mb-4">You don't have any investments yet</p>
+                  <Button onClick={() => navigate("/investments")}>Start Investing</Button>
+                </div>
+              )}
             </CardContent>
           </Card>
           
@@ -109,32 +157,24 @@ const Dashboard = () => {
               <CardDescription>Tasks with the highest rewards</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                <TaskItem 
-                  title="Complete KYC Verification" 
-                  reward="$50" 
-                  difficulty="Easy" 
-                  dueDate="Today"
-                />
-                <TaskItem 
-                  title="Daily Login Streak" 
-                  reward="$5" 
-                  difficulty="Easy" 
-                  dueDate="Today"
-                />
-                <TaskItem 
-                  title="Refer 3 Friends" 
-                  reward="$100" 
-                  difficulty="Medium" 
-                  dueDate="5 days"
-                />
-                <TaskItem 
-                  title="Complete Survey" 
-                  reward="$25" 
-                  difficulty="Easy" 
-                  dueDate="3 days"
-                />
-              </div>
+              {pendingTasks.length > 0 ? (
+                <div className="space-y-4">
+                  {pendingTasks.slice(0, 4).map(task => (
+                    <TaskItem 
+                      key={task.id}
+                      title={task.title}
+                      reward={`$${task.reward}`}
+                      difficulty={task.difficulty}
+                      dueDate={task.expiration_date ? new Date(task.expiration_date).toLocaleDateString() : "No expiration"}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="py-10 text-center">
+                  <p className="text-muted-foreground mb-4">No pending tasks</p>
+                  <Button onClick={() => navigate("/tasks")}>View All Tasks</Button>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -162,7 +202,9 @@ const StatsCard = ({ title, value, change, icon, isPositive }: StatsCardProps) =
         <div className="text-2xl font-bold">{value}</div>
         <div className={`flex items-center mt-2 text-xs ${isPositive ? 'text-green-500' : 'text-red-500'}`}>
           <span>{change}</span>
-          <ArrowUpRight size={14} className={`ml-1 ${!isPositive && 'rotate-180'}`} />
+          {typeof change === 'string' && change.includes('%') && (
+            <ArrowUpRight size={14} className={`ml-1 ${!isPositive && 'rotate-180'}`} />
+          )}
         </div>
       </CardContent>
     </Card>
@@ -204,8 +246,8 @@ interface TaskItemProps {
 
 const TaskItem = ({ title, reward, difficulty, dueDate }: TaskItemProps) => {
   const getDifficultyColor = (diff: string) => {
-    if (diff === "Easy") return "bg-green-100 text-green-800";
-    if (diff === "Medium") return "bg-yellow-100 text-yellow-800";
+    if (diff === "easy") return "bg-green-100 text-green-800";
+    if (diff === "medium") return "bg-yellow-100 text-yellow-800";
     return "bg-red-100 text-red-800";
   };
 
