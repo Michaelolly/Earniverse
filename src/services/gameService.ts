@@ -25,7 +25,10 @@ export interface GameSession {
 
 export const fetchGames = async (): Promise<Game[]> => {
   try {
-    const { data, error } = await supabase.from('games').select('*').eq('active', true);
+    const { data, error } = await supabase
+      .from('games')
+      .select('*')
+      .eq('active', true);
     
     if (error) {
       console.error('Error fetching games:', error);
@@ -38,7 +41,7 @@ export const fetchGames = async (): Promise<Game[]> => {
     }
     
     return data || [];
-  } catch (error) {
+  } catch (error: any) {
     console.error('Unexpected error fetching games:', error);
     return [];
   }
@@ -58,7 +61,7 @@ export const fetchGameHistory = async (userId: string): Promise<GameSession[]> =
     }
     
     return data || [];
-  } catch (error) {
+  } catch (error: any) {
     console.error('Unexpected error fetching game history:', error);
     return [];
   }
@@ -101,7 +104,7 @@ export const playGame = async (
       .select()
       .single();
     
-    if (sessionError) {
+    if (sessionError || !sessionData) {
       return { success: false, error: 'Failed to record game session' };
     }
     
@@ -109,13 +112,15 @@ export const playGame = async (
     const balanceChange = (gameOutcome.win_amount || 0) - betAmount;
     const transactionType = balanceChange >= 0 ? 'game_win' : 'game_loss';
     
-    // Update balance
-    const { error: updateError } = await supabase.rpc('update_balance_after_game', {
-      p_user_id: userId,
-      p_amount: balanceChange,
-      p_game_session_id: sessionData.id,
-      p_transaction_type: transactionType,
-      p_description: `${transactionType === 'game_win' ? 'Won' : 'Lost'} in ${gameId}`
+    // Call the Supabase Edge Function to update balance
+    const { error: updateError } = await supabase.functions.invoke("update_balance_after_game", {
+      body: {
+        p_user_id: userId,
+        p_amount: balanceChange,
+        p_game_session_id: sessionData.id,
+        p_transaction_type: transactionType,
+        p_description: `${transactionType === 'game_win' ? 'Won' : 'Lost'} in ${gameId}`
+      }
     });
     
     if (updateError) {
@@ -123,7 +128,7 @@ export const playGame = async (
     }
     
     return { success: true, session: sessionData };
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error in playGame:', error);
     return { success: false, error: 'An unexpected error occurred' };
   }
@@ -133,13 +138,13 @@ export const playGame = async (
 export const playCoinFlip = async (userId: string, betAmount: number, userChoice: 'heads' | 'tails'): Promise<{ success: boolean; message?: string; error?: string }> => {
   try {
     // Get the coin flip game
-    const { data: gameData } = await supabase
+    const { data: gameData, error: gameError } = await supabase
       .from('games')
       .select('id')
       .eq('name', 'Coin Flip')
       .single();
     
-    if (!gameData) {
+    if (gameError || !gameData) {
       return { success: false, error: 'Game not found' };
     }
     
@@ -168,7 +173,7 @@ export const playCoinFlip = async (userId: string, betAmount: number, userChoice
         ? `You won! The coin landed on ${result}` 
         : `You lost. The coin landed on ${result}`
     };
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error in playCoinFlip:', error);
     return { success: false, error: 'An unexpected error occurred' };
   }
@@ -177,13 +182,13 @@ export const playCoinFlip = async (userId: string, betAmount: number, userChoice
 export const playDiceRoll = async (userId: string, betAmount: number, userChoice: 'higher' | 'lower'): Promise<{ success: boolean; message?: string; error?: string; roll?: number }> => {
   try {
     // Get the dice roll game
-    const { data: gameData } = await supabase
+    const { data: gameData, error: gameError } = await supabase
       .from('games')
       .select('id')
       .eq('name', 'Dice Roll')
       .single();
     
-    if (!gameData) {
+    if (gameError || !gameData) {
       return { success: false, error: 'Game not found' };
     }
     
@@ -213,7 +218,7 @@ export const playDiceRoll = async (userId: string, betAmount: number, userChoice
         ? `You won! The dice rolled ${roll}` 
         : `You lost. The dice rolled ${roll}`
     };
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error in playDiceRoll:', error);
     return { success: false, error: 'An unexpected error occurred' };
   }

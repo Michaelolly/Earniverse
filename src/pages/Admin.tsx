@@ -24,10 +24,10 @@ import { isUserAdmin } from "@/services/userService";
 
 const taskFormSchema = z.object({
   title: z.string().min(3, { message: "Title must be at least 3 characters" }),
-  description: z.string().optional(),
+  description: z.string().optional().nullable(),
   reward: z.coerce.number().positive({ message: "Reward must be positive" }),
   difficulty: z.string().min(1, { message: "Please select a difficulty" }),
-  expiration_date: z.string().optional(),
+  expiration_date: z.string().optional().nullable(),
   is_active: z.boolean().default(true),
 });
 
@@ -124,10 +124,18 @@ const Admin = () => {
     if (!user) return;
 
     setIsSubmitting(true);
-    const result = await createTask({
-      ...values,
+    // Ensure all required fields are present in the task
+    const taskData = {
+      title: values.title,
+      description: values.description || "",
+      reward: values.reward,
+      difficulty: values.difficulty,
+      is_active: values.is_active,
       created_by: user.id,
-    });
+      expiration_date: values.expiration_date || null,
+    };
+    
+    const result = await createTask(taskData);
     
     if (result.success) {
       toast({

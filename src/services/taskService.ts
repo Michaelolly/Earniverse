@@ -40,7 +40,7 @@ export const fetchTasks = async (): Promise<Task[]> => {
     }
     
     return data || [];
-  } catch (error) {
+  } catch (error: any) {
     console.error('Unexpected error fetching tasks:', error);
     return [];
   }
@@ -59,7 +59,7 @@ export const fetchUserTasks = async (userId: string): Promise<UserTask[]> => {
     }
     
     return data || [];
-  } catch (error) {
+  } catch (error: any) {
     console.error('Unexpected error fetching user tasks:', error);
     return [];
   }
@@ -102,7 +102,7 @@ export const startTask = async (
     }
     
     return { success: true };
-  } catch (error) {
+  } catch (error: any) {
     console.error('Unexpected error starting task:', error);
     return { success: false, error: 'An unexpected error occurred' };
   }
@@ -179,7 +179,7 @@ export const completeTask = async (
     }
     
     return { success: true };
-  } catch (error) {
+  } catch (error: any) {
     console.error('Unexpected error completing task:', error);
     return { success: false, error: 'An unexpected error occurred' };
   }
@@ -187,7 +187,15 @@ export const completeTask = async (
 
 // Admin functions
 export const createTask = async (
-  task: Omit<Task, 'id' | 'created_at'>
+  task: {
+    title: string;
+    description: string | null;
+    reward: number;
+    difficulty: string;
+    is_active: boolean;
+    created_by: string | null;
+    expiration_date?: string | null;
+  }
 ): Promise<{ success: boolean; task?: Task; error?: string }> => {
   try {
     const { data, error } = await supabase
@@ -202,7 +210,7 @@ export const createTask = async (
     }
     
     return { success: true, task: data };
-  } catch (error) {
+  } catch (error: any) {
     console.error('Unexpected error creating task:', error);
     return { success: false, error: 'An unexpected error occurred' };
   }

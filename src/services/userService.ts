@@ -44,7 +44,7 @@ export const fetchUserProfile = async (userId: string): Promise<UserProfile | nu
     }
     
     return data;
-  } catch (error) {
+  } catch (error: any) {
     console.error('Unexpected error fetching user profile:', error);
     return null;
   }
@@ -64,7 +64,7 @@ export const fetchUserBalance = async (userId: string): Promise<UserBalance | nu
     }
     
     return data;
-  } catch (error) {
+  } catch (error: any) {
     console.error('Unexpected error fetching user balance:', error);
     return null;
   }
@@ -84,7 +84,7 @@ export const fetchUserTransactions = async (userId: string): Promise<Transaction
     }
     
     return data || [];
-  } catch (error) {
+  } catch (error: any) {
     console.error('Unexpected error fetching user transactions:', error);
     return [];
   }
@@ -111,7 +111,7 @@ export const updateUserProfile = async (
     }
     
     return { success: true, profile: data };
-  } catch (error) {
+  } catch (error: any) {
     console.error('Unexpected error updating profile:', error);
     return { success: false, error: 'An unexpected error occurred' };
   }
@@ -131,7 +131,7 @@ export const isUserAdmin = async (userId: string): Promise<boolean> => {
     }
     
     return data.role === 'admin';
-  } catch (error) {
+  } catch (error: any) {
     console.error('Unexpected error checking admin status:', error);
     return false;
   }
@@ -155,7 +155,7 @@ export const fetchAllUsers = async (): Promise<UserProfile[]> => {
     }
     
     return data || [];
-  } catch (error) {
+  } catch (error: any) {
     console.error('Unexpected error fetching all users:', error);
     return [];
   }
@@ -178,7 +178,7 @@ export const fetchAllBalances = async (): Promise<UserBalance[]> => {
     }
     
     return data || [];
-  } catch (error) {
+  } catch (error: any) {
     console.error('Unexpected error fetching all balances:', error);
     return [];
   }
@@ -194,7 +194,7 @@ export const makeUserAdmin = async (userEmail: string): Promise<{ success: boole
     }
     
     return { success: true };
-  } catch (error) {
+  } catch (error: any) {
     console.error('Unexpected error making user admin:', error);
     return { success: false, error: 'An unexpected error occurred' };
   }
