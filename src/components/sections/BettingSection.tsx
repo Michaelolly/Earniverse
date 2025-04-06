@@ -1,7 +1,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { FootballIcon, Dice5Icon, MonitorPlay, MessageSquareQuote, Shield } from "lucide-react";
+import { Football, Dice5, MonitorPlay, MessageSquareQuote, Shield } from "lucide-react";
 
 const BettingSection = () => {
   return (
@@ -17,11 +17,11 @@ const BettingSection = () => {
             
             <div className="space-y-4">
               <FeatureItem 
-                icon={<Dice5Icon size={20} />} 
+                icon={<Dice5 size={20} />} 
                 text="Variety of casino games with transparent odds" 
               />
               <FeatureItem 
-                icon={<FootballIcon size={20} />} 
+                icon={<Football size={20} />} 
                 text="Live sports betting with real-time updates" 
               />
               <FeatureItem 
@@ -49,7 +49,7 @@ const BettingSection = () => {
                 <GameCard 
                   category="Casino"
                   title="Premium Blackjack"
-                  icon={<Dice5Icon size={24} />}
+                  icon={<Dice5 size={24} />}
                   bgClass="bg-gradient-to-br from-earniverse-blue to-earniverse-navy"
                   users="1,248 playing"
                   className="animate-zoom-in"
@@ -57,7 +57,7 @@ const BettingSection = () => {
                 <GameCard 
                   category="Sports"
                   title="UEFA Champions League"
-                  icon={<FootballIcon size={24} />}
+                  icon={<Football size={24} />}
                   bgClass="bg-gradient-to-br from-earniverse-purple to-earniverse-deep-purple"
                   users="3,542 betting"
                   className="sm:mt-8 animate-zoom-in"
