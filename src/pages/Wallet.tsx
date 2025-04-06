@@ -1,5 +1,5 @@
 
-import { useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import DashboardLayout from "@/components/layout/DashboardLayout";
@@ -8,18 +8,74 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArrowUpRight, ArrowDownLeft, Clock, CreditCard, Plus, ArrowRight, Download, ExternalLink, Copy, RefreshCw } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import DepositFundsDialog from "@/components/wallet/DepositFundsDialog";
 
 const Wallet = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const [balance, setBalance] = useState<number | null>(null);
+  const [transactions, setTransactions] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     if (!loading && !user) {
       navigate("/auth");
+    } else if (user) {
+      fetchUserBalance();
+      fetchTransactions();
     }
   }, [user, loading, navigate]);
 
-  if (loading) {
+  const fetchUserBalance = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('user_balances')
+        .select('balance')
+        .eq('user_id', user?.id)
+        .single();
+      
+      if (error) {
+        console.error("Error fetching balance:", error);
+      } else {
+        setBalance(data.balance);
+      }
+    } catch (error) {
+      console.error("Unexpected error fetching balance:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const fetchTransactions = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('transactions')
+        .select('*')
+        .eq('user_id', user?.id)
+        .order('created_at', { ascending: false })
+        .limit(5);
+      
+      if (error) {
+        console.error("Error fetching transactions:", error);
+      } else {
+        setTransactions(data || []);
+      }
+    } catch (error) {
+      console.error("Unexpected error fetching transactions:", error);
+    }
+  };
+
+  const handleWithdraw = () => {
+    toast({
+      title: "Coming Soon",
+      description: "Withdrawal functionality will be implemented soon.",
+    });
+  };
+
+  if (loading || isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-earniverse-gold"></div>
@@ -35,10 +91,7 @@ const Wallet = () => {
             <h1 className="text-2xl font-bold">Wallet</h1>
             <p className="text-muted-foreground">Manage your funds and transactions</p>
           </div>
-          <Button className="bg-earniverse-gold hover:bg-earniverse-royal-gold text-black gap-2">
-            <Plus size={16} />
-            Add Funds
-          </Button>
+          <DepositFundsDialog />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -47,33 +100,33 @@ const Wallet = () => {
               <div className="flex flex-col md:flex-row justify-between gap-6">
                 <div>
                   <p className="text-sm text-muted-foreground mb-1">Available Balance</p>
-                  <p className="text-3xl font-bold mb-4">$8,459.32</p>
+                  <p className="text-3xl font-bold mb-4">${balance !== null ? balance.toFixed(2) : "0.00"}</p>
                   <div className="flex flex-wrap gap-2">
-                    <Button size="sm" className="gap-1">
+                    <Button onClick={handleWithdraw} size="sm" className="gap-1">
                       <ArrowUpRight size={14} />
-                      Send
-                    </Button>
-                    <Button size="sm" className="gap-1">
-                      <ArrowDownLeft size={14} />
-                      Receive
+                      Withdraw
                     </Button>
                     <Button size="sm" variant="outline" className="gap-1">
                       <RefreshCw size={14} />
-                      Convert
+                      Refresh
                     </Button>
                   </div>
                 </div>
                 <div className="space-y-2">
                   <p className="text-sm text-muted-foreground">Wallet ID</p>
                   <div className="flex items-center gap-2">
-                    <code className="bg-muted px-2 py-1 rounded text-sm">exm1...k94j2</code>
-                    <Button variant="ghost" size="icon" className="h-7 w-7">
+                    <code className="bg-muted px-2 py-1 rounded text-sm">{user?.id?.substring(0, 6)}...{user?.id?.substring(user.id.length - 4)}</code>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-7 w-7"
+                      onClick={() => {
+                        navigator.clipboard.writeText(user?.id || "");
+                        toast({ title: "Copied to clipboard" });
+                      }}
+                    >
                       <Copy size={14} />
                     </Button>
-                  </div>
-                  <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                    <ExternalLink size={14} />
-                    <span>View on Explorer</span>
                   </div>
                 </div>
               </div>
@@ -86,10 +139,10 @@ const Wallet = () => {
             </CardHeader>
             <CardContent className="pt-0">
               <div className="grid grid-cols-2 gap-2">
-                <ActionButton icon={<Plus size={16} />} label="Add Funds" />
-                <ActionButton icon={<ArrowUpRight size={16} />} label="Withdraw" />
-                <ActionButton icon={<CreditCard size={16} />} label="Link Card" />
-                <ActionButton icon={<Download size={16} />} label="Export" />
+                <ActionButton icon={<Plus size={16} />} label="Add Funds" onClick={() => document.querySelector<HTMLButtonElement>('[data-dialog-trigger="deposit"]')?.click()} />
+                <ActionButton icon={<ArrowUpRight size={16} />} label="Withdraw" onClick={handleWithdraw} />
+                <ActionButton icon={<CreditCard size={16} />} label="Link Card" onClick={() => toast({ title: "Coming Soon" })} />
+                <ActionButton icon={<Download size={16} />} label="Export" onClick={() => toast({ title: "Coming Soon" })} />
               </div>
             </CardContent>
           </Card>
@@ -115,46 +168,23 @@ const Wallet = () => {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  <TransactionItem
-                    type="Deposit"
-                    description="Bank Transfer"
-                    amount="+ $2,000.00"
-                    date="Apr 04, 2025"
-                    status="Completed"
-                    isCredit={true}
-                  />
-                  <TransactionItem
-                    type="Withdrawal"
-                    description="To Bank Account"
-                    amount="- $500.00"
-                    date="Apr 02, 2025"
-                    status="Completed"
-                    isCredit={false}
-                  />
-                  <TransactionItem
-                    type="Game"
-                    description="Blackjack Winnings"
-                    amount="+ $340.50"
-                    date="Apr 02, 2025"
-                    status="Completed"
-                    isCredit={true}
-                  />
-                  <TransactionItem
-                    type="Investment"
-                    description="Tech ETF Purchase"
-                    amount="- $1,000.00"
-                    date="Apr 01, 2025"
-                    status="Completed"
-                    isCredit={false}
-                  />
-                  <TransactionItem
-                    type="Task"
-                    description="Survey Completion"
-                    amount="+ $25.00"
-                    date="Mar 30, 2025"
-                    status="Completed"
-                    isCredit={true}
-                  />
+                  {transactions.length > 0 ? (
+                    transactions.map((transaction) => (
+                      <TransactionItem
+                        key={transaction.id}
+                        type={transaction.type}
+                        description={transaction.description}
+                        amount={transaction.amount > 0 ? `+ $${transaction.amount.toFixed(2)}` : `- $${Math.abs(transaction.amount).toFixed(2)}`}
+                        date={new Date(transaction.created_at).toLocaleDateString()}
+                        status="Completed"
+                        isCredit={transaction.amount > 0}
+                      />
+                    ))
+                  ) : (
+                    <div className="text-center py-6 text-muted-foreground">
+                      No transactions yet
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -215,7 +245,7 @@ const Wallet = () => {
                       </div>
                     </div>
                     
-                    <Button className="w-full">Continue</Button>
+                    <Button className="w-full" data-dialog-trigger="deposit">Add Funds</Button>
                   </div>
                 </CardContent>
               </Card>
@@ -259,7 +289,7 @@ const Wallet = () => {
                       </Button>
                     </div>
                     
-                    <Button className="w-full">Continue</Button>
+                    <Button className="w-full" onClick={handleWithdraw}>Withdraw</Button>
                   </div>
                 </CardContent>
               </Card>
@@ -276,26 +306,10 @@ const Wallet = () => {
                   <AssetItem
                     name="US Dollar"
                     ticker="USD"
-                    balance="5,234.55"
-                    value="$5,234.55"
+                    balance={balance?.toString() || "0.00"}
+                    value={`$${balance?.toFixed(2) || "0.00"}`}
                     change="+0.0%"
                     isPositive={true}
-                  />
-                  <AssetItem
-                    name="Bitcoin"
-                    ticker="BTC"
-                    balance="0.045"
-                    value="$2,457.32"
-                    change="+2.4%"
-                    isPositive={true}
-                  />
-                  <AssetItem
-                    name="Ethereum"
-                    ticker="ETH"
-                    balance="0.78"
-                    value="$767.45"
-                    change="-1.2%"
-                    isPositive={false}
                   />
                 </div>
               </CardContent>
@@ -310,11 +324,12 @@ const Wallet = () => {
 interface ActionButtonProps {
   icon: React.ReactNode;
   label: string;
+  onClick?: () => void;
 }
 
-const ActionButton = ({ icon, label }: ActionButtonProps) => {
+const ActionButton = ({ icon, label, onClick }: ActionButtonProps) => {
   return (
-    <Button variant="outline" className="flex flex-col h-auto py-4 gap-2">
+    <Button variant="outline" className="flex flex-col h-auto py-4 gap-2" onClick={onClick}>
       <div className="p-2 rounded-full bg-earniverse-purple/10">
         <div className="text-earniverse-purple">{icon}</div>
       </div>
@@ -334,11 +349,23 @@ interface TransactionItemProps {
 
 const TransactionItem = ({ type, description, amount, date, status, isCredit }: TransactionItemProps) => {
   const getTypeIcon = (transactionType: string) => {
-    if (transactionType === "Deposit" || transactionType === "Task") return <ArrowDownLeft size={16} className="text-green-600" />;
-    if (transactionType === "Withdrawal") return <ArrowUpRight size={16} className="text-amber-600" />;
-    if (transactionType === "Game") return <Gamepad2 size={16} className="text-blue-600" />;
-    if (transactionType === "Investment") return <BarChart2 size={16} className="text-purple-600" />;
+    if (transactionType === "deposit" || transactionType === "task_reward") return <ArrowDownLeft size={16} className="text-green-600" />;
+    if (transactionType === "withdrawal") return <ArrowUpRight size={16} className="text-amber-600" />;
+    if (transactionType === "game") return <Gamepad2 size={16} className="text-blue-600" />;
+    if (transactionType === "investment" || transactionType === "investment_sale") return <BarChart2 size={16} className="text-purple-600" />;
     return <Clock size={16} />;
+  };
+
+  const formatTransactionType = (type: string) => {
+    switch (type) {
+      case "deposit": return "Deposit";
+      case "withdrawal": return "Withdrawal";
+      case "game": return "Game";
+      case "investment": return "Investment";
+      case "investment_sale": return "Investment Sale";
+      case "task_reward": return "Task Reward";
+      default: return type.charAt(0).toUpperCase() + type.slice(1);
+    }
   };
 
   return (
@@ -349,7 +376,7 @@ const TransactionItem = ({ type, description, amount, date, status, isCredit }: 
         </div>
         <div>
           <div className="flex items-center">
-            <p className="font-medium">{type}</p>
+            <p className="font-medium">{formatTransactionType(type)}</p>
           </div>
           <p className="text-sm text-muted-foreground">{description}</p>
         </div>
