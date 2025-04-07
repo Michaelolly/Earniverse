@@ -1,5 +1,4 @@
-
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import DashboardLayout from "@/components/layout/DashboardLayout";
@@ -9,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArrowUpRight, ArrowDownLeft, Clock, CreditCard, Plus, ArrowRight, Download, ExternalLink, Copy, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { userService } from "@/services/userService";
 import DepositFundsDialog from "@/components/wallet/DepositFundsDialog";
 
 const Wallet = () => {
@@ -19,6 +18,34 @@ const Wallet = () => {
   const [balance, setBalance] = useState<number | null>(null);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  const fetchUserBalance = useCallback(async () => {
+    try {
+      if (!user) return;
+      
+      const data = await userService.fetchUserBalance(user.id);
+      
+      if (data) {
+        setBalance(data.balance);
+      }
+    } catch (error) {
+      console.error("Error fetching balance:", error);
+    }
+  }, [user]);
+
+  const fetchTransactions = useCallback(async () => {
+    try {
+      if (!user) return;
+      
+      const data = await userService.fetchUserTransactions(user.id);
+      setTransactions(data || []);
+    } catch (error) {
+      console.error("Error fetching transactions:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user]);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -27,45 +54,11 @@ const Wallet = () => {
       fetchUserBalance();
       fetchTransactions();
     }
-  }, [user, loading, navigate]);
+  }, [user, loading, navigate, refreshTrigger, fetchUserBalance, fetchTransactions]);
 
-  const fetchUserBalance = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('user_balances')
-        .select('balance')
-        .eq('user_id', user?.id)
-        .single();
-      
-      if (error) {
-        console.error("Error fetching balance:", error);
-      } else {
-        setBalance(data.balance);
-      }
-    } catch (error) {
-      console.error("Unexpected error fetching balance:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const fetchTransactions = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('transactions')
-        .select('*')
-        .eq('user_id', user?.id)
-        .order('created_at', { ascending: false })
-        .limit(5);
-      
-      if (error) {
-        console.error("Error fetching transactions:", error);
-      } else {
-        setTransactions(data || []);
-      }
-    } catch (error) {
-      console.error("Unexpected error fetching transactions:", error);
-    }
+  const handleRefresh = () => {
+    setIsLoading(true);
+    setRefreshTrigger(prev => prev + 1); // Trigger re-fetch
   };
 
   const handleWithdraw = () => {
@@ -106,7 +99,7 @@ const Wallet = () => {
                       <ArrowUpRight size={14} />
                       Withdraw
                     </Button>
-                    <Button size="sm" variant="outline" className="gap-1">
+                    <Button size="sm" variant="outline" className="gap-1" onClick={handleRefresh}>
                       <RefreshCw size={14} />
                       Refresh
                     </Button>

@@ -117,6 +117,38 @@ export const updateUserProfile = async (
   }
 };
 
+export const processDeposit = async (
+  userId: string, 
+  newBalance: number,
+  transactionData: {
+    user_id: string;
+    amount: number;
+    type: string;
+    description: string;
+  }
+): Promise<{ success: boolean; error?: string }> => {
+  try {
+    // Use Supabase's built-in transaction to ensure atomicity
+    const { error } = await supabase.rpc('process_deposit', { 
+      p_user_id: userId,
+      p_amount: transactionData.amount,
+      p_type: transactionData.type,
+      p_description: transactionData.description,
+      p_new_balance: newBalance
+    });
+    
+    if (error) {
+      console.error('Error processing deposit:', error);
+      return { success: false, error: error.message };
+    }
+    
+    return { success: true };
+  } catch (error: any) {
+    console.error('Unexpected error processing deposit:', error);
+    return { success: false, error: 'An unexpected error occurred' };
+  }
+};
+
 export const isUserAdmin = async (userId: string): Promise<boolean> => {
   try {
     const { data, error } = await supabase
@@ -209,5 +241,6 @@ export const userService = {
   isUserAdmin,
   fetchAllUsers,
   fetchAllBalances,
-  makeUserAdmin
+  makeUserAdmin,
+  processDeposit
 };

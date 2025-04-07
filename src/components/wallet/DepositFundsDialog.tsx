@@ -6,7 +6,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, CreditCard, Check } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 import { userService } from "@/services/userService";
 
@@ -97,39 +96,32 @@ const DepositFundsDialog = () => {
     setIsLoading(true);
 
     try {
-      // 1. Get current user balance
-      const { data: balanceData, error: balanceError } = await supabase
-        .from('user_balances')
-        .select('balance')
-        .eq('user_id', user.id)
-        .single();
+      // Get current user balance first
+      const userBalance = await userService.fetchUserBalance(user.id);
       
-      if (balanceError) {
-        throw balanceError;
+      if (!userBalance) {
+        throw new Error("Failed to retrieve user balance");
       }
-
-      // 2. Update user balance
-      const { error: updateError } = await supabase
-        .from('user_balances')
-        .update({ balance: balanceData.balance + depositAmount })
-        .eq('user_id', user.id);
       
-      if (updateError) {
-        throw updateError;
-      }
-
-      // 3. Add transaction record
-      const { error: transactionError } = await supabase
-        .from('transactions')
-        .insert({
-          user_id: user.id,
-          amount: depositAmount,
-          type: 'deposit',
-          description: 'Card deposit'
-        });
+      const newBalance = userBalance.balance + depositAmount;
       
-      if (transactionError) {
-        throw transactionError;
+      // Create transaction record
+      const transactionData = {
+        user_id: user.id,
+        amount: depositAmount,
+        type: 'deposit',
+        description: 'Card deposit'
+      };
+      
+      // Update user balance and add transaction
+      const result = await userService.processDeposit(
+        user.id,
+        newBalance,
+        transactionData
+      );
+      
+      if (!result.success) {
+        throw new Error(result.error || "Failed to process deposit");
       }
 
       // Show success state
@@ -154,6 +146,7 @@ const DepositFundsDialog = () => {
         description: "There was an error processing your deposit. Please try again.",
         variant: "destructive",
       });
+    } finally {
       setIsLoading(false);
     }
   };
