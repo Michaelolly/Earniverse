@@ -65,15 +65,9 @@ const DepositFundsDialog = () => {
   };
 
   const handleDeposit = async () => {
-    if (!user) {
-      toast({
-        title: "Authentication required",
-        description: "You must be signed in to deposit funds.",
-        variant: "destructive",
-      });
-      return;
-    }
-
+    // Remove authentication check
+    const userId = user?.id || "guest-user"; // Fall back to "guest-user" if no auth user
+    
     const depositAmount = parseFloat(amount);
     if (isNaN(depositAmount) || depositAmount <= 0) {
       toast({
@@ -96,26 +90,34 @@ const DepositFundsDialog = () => {
     setIsLoading(true);
 
     try {
-      // Get current user balance first
-      const userBalance = await userService.fetchUserBalance(user.id);
+      // Get current user balance or default to 0
+      let userBalance = await userService.fetchUserBalance(userId);
       
+      // If no balance record exists (for guest users), create a default one
       if (!userBalance) {
-        throw new Error("Failed to retrieve user balance");
+        userBalance = {
+          id: "temp-id",
+          user_id: userId,
+          balance: 0,
+          total_winnings: 0,
+          total_losses: 0,
+          updated_at: new Date().toISOString()
+        };
       }
       
       const newBalance = userBalance.balance + depositAmount;
       
       // Create transaction record
       const transactionData = {
-        user_id: user.id,
+        user_id: userId,
         amount: depositAmount,
         type: 'deposit',
         description: 'Card deposit'
       };
       
-      // Update user balance and add transaction
+      // Process the deposit without authentication requirements
       const result = await userService.processDeposit(
-        user.id,
+        userId,
         newBalance,
         transactionData
       );

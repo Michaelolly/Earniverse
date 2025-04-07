@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 
@@ -127,21 +128,62 @@ export const processDeposit = async (
   }
 ): Promise<{ success: boolean; error?: string }> => {
   try {
-    // First update the balance
-    const { error: balanceError } = await supabase
-      .from('user_balances')
-      .update({ 
-        balance: newBalance,
-        updated_at: new Date().toISOString()
-      })
-      .eq('user_id', userId);
+    console.log("Processing deposit for user:", userId, "with new balance:", newBalance);
     
-    if (balanceError) {
-      console.error('Error updating balance:', balanceError);
-      return { success: false, error: balanceError.message };
+    // For guest users, we might need to create a balance record first
+    if (userId === "guest-user") {
+      // Check if a record exists
+      const { data: existingBalance } = await supabase
+        .from('user_balances')
+        .select('*')
+        .eq('user_id', userId);
+      
+      if (!existingBalance || existingBalance.length === 0) {
+        // Create a new balance record for guest
+        const { error: insertError } = await supabase
+          .from('user_balances')
+          .insert({
+            user_id: userId,
+            balance: newBalance,
+            updated_at: new Date().toISOString()
+          });
+          
+        if (insertError) {
+          console.error('Error creating balance for guest:', insertError);
+          return { success: false, error: insertError.message };
+        }
+      } else {
+        // Update existing balance
+        const { error: updateError } = await supabase
+          .from('user_balances')
+          .update({ 
+            balance: newBalance,
+            updated_at: new Date().toISOString()
+          })
+          .eq('user_id', userId);
+        
+        if (updateError) {
+          console.error('Error updating balance:', updateError);
+          return { success: false, error: updateError.message };
+        }
+      }
+    } else {
+      // Regular user, just update balance
+      const { error: balanceError } = await supabase
+        .from('user_balances')
+        .update({ 
+          balance: newBalance,
+          updated_at: new Date().toISOString()
+        })
+        .eq('user_id', userId);
+      
+      if (balanceError) {
+        console.error('Error updating balance:', balanceError);
+        return { success: false, error: balanceError.message };
+      }
     }
     
-    // Then create the transaction record
+    // Create transaction record - this is now separate from the balance update
     const { error: transactionError } = await supabase
       .from('transactions')
       .insert({

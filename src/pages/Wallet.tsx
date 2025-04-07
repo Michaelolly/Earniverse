@@ -19,46 +19,43 @@ const Wallet = () => {
   const [transactions, setTransactions] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  
+  const userId = user?.id || "guest-user";
 
   const fetchUserBalance = useCallback(async () => {
     try {
-      if (!user) return;
-      
-      const data = await userService.fetchUserBalance(user.id);
+      const data = await userService.fetchUserBalance(userId);
       
       if (data) {
         setBalance(data.balance);
+      } else {
+        setBalance(0);
       }
     } catch (error) {
       console.error("Error fetching balance:", error);
+      setBalance(0);
     }
-  }, [user]);
+  }, [userId]);
 
   const fetchTransactions = useCallback(async () => {
     try {
-      if (!user) return;
-      
-      const data = await userService.fetchUserTransactions(user.id);
+      const data = await userService.fetchUserTransactions(userId);
       setTransactions(data || []);
     } catch (error) {
       console.error("Error fetching transactions:", error);
     } finally {
       setIsLoading(false);
     }
-  }, [user]);
+  }, [userId]);
 
   useEffect(() => {
-    if (!loading && !user) {
-      navigate("/auth");
-    } else if (user) {
-      fetchUserBalance();
-      fetchTransactions();
-    }
-  }, [user, loading, navigate, refreshTrigger, fetchUserBalance, fetchTransactions]);
+    fetchUserBalance();
+    fetchTransactions();
+  }, [refreshTrigger, fetchUserBalance, fetchTransactions]);
 
   const handleRefresh = () => {
     setIsLoading(true);
-    setRefreshTrigger(prev => prev + 1); // Trigger re-fetch
+    setRefreshTrigger(prev => prev + 1);
   };
 
   const handleWithdraw = () => {
@@ -68,7 +65,7 @@ const Wallet = () => {
     });
   };
 
-  if (loading || isLoading) {
+  if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-earniverse-gold"></div>
@@ -108,13 +105,13 @@ const Wallet = () => {
                 <div className="space-y-2">
                   <p className="text-sm text-muted-foreground">Wallet ID</p>
                   <div className="flex items-center gap-2">
-                    <code className="bg-muted px-2 py-1 rounded text-sm">{user?.id?.substring(0, 6)}...{user?.id?.substring(user.id.length - 4)}</code>
+                    <code className="bg-muted px-2 py-1 rounded text-sm">{userId?.substring(0, 6)}...{userId?.substring((userId?.length || 0) - 4)}</code>
                     <Button 
                       variant="ghost" 
                       size="icon" 
                       className="h-7 w-7"
                       onClick={() => {
-                        navigator.clipboard.writeText(user?.id || "");
+                        navigator.clipboard.writeText(userId || "");
                         toast({ title: "Copied to clipboard" });
                       }}
                     >
