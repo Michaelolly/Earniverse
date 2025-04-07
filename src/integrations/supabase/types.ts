@@ -279,6 +279,16 @@ export type Database = {
         }
         Returns: undefined
       }
+      process_deposit: {
+        Args: {
+          p_user_id: string
+          p_amount: number
+          p_type: string
+          p_description: string
+          p_new_balance: number
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never

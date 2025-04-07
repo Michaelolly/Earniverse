@@ -128,7 +128,7 @@ export const processDeposit = async (
   }
 ): Promise<{ success: boolean; error?: string }> => {
   try {
-    // Use Supabase's built-in transaction to ensure atomicity
+    // Use Supabase's built-in function to ensure atomicity
     const { error } = await supabase.rpc('process_deposit', { 
       p_user_id: userId,
       p_amount: transactionData.amount,
