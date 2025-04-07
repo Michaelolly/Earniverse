@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 
@@ -128,18 +127,34 @@ export const processDeposit = async (
   }
 ): Promise<{ success: boolean; error?: string }> => {
   try {
-    // Use Supabase's built-in function to ensure atomicity
-    const { error } = await supabase.rpc('process_deposit', { 
-      p_user_id: userId,
-      p_amount: transactionData.amount,
-      p_type: transactionData.type,
-      p_description: transactionData.description,
-      p_new_balance: newBalance
-    });
+    // First update the balance
+    const { error: balanceError } = await supabase
+      .from('user_balances')
+      .update({ 
+        balance: newBalance,
+        updated_at: new Date().toISOString()
+      })
+      .eq('user_id', userId);
     
-    if (error) {
-      console.error('Error processing deposit:', error);
-      return { success: false, error: error.message };
+    if (balanceError) {
+      console.error('Error updating balance:', balanceError);
+      return { success: false, error: balanceError.message };
+    }
+    
+    // Then create the transaction record
+    const { error: transactionError } = await supabase
+      .from('transactions')
+      .insert({
+        user_id: transactionData.user_id,
+        amount: transactionData.amount,
+        type: transactionData.type,
+        description: transactionData.description,
+        created_at: new Date().toISOString()
+      });
+    
+    if (transactionError) {
+      console.error('Error creating transaction:', transactionError);
+      return { success: false, error: transactionError.message };
     }
     
     return { success: true };
@@ -169,7 +184,6 @@ export const isUserAdmin = async (userId: string): Promise<boolean> => {
   }
 };
 
-// Admin-specific functions
 export const fetchAllUsers = async (): Promise<UserProfile[]> => {
   try {
     const { data, error } = await supabase
@@ -232,7 +246,6 @@ export const makeUserAdmin = async (userEmail: string): Promise<{ success: boole
   }
 };
 
-// Export as a service object for better imports
 export const userService = {
   fetchUserProfile,
   fetchUserBalance,
