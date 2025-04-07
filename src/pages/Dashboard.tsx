@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
@@ -7,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ArrowUpRight, TrendingUp, Users, Wallet, BarChart2, Calendar } from "lucide-react";
 import { fetchUserBalance, fetchUserTransactions } from "@/services/userService";
 import { fetchUserInvestments, Investment } from "@/services/investmentService";
-import { fetchTasks, Task, fetchUserTasks, UserTask } from "@/services/taskService";
+import { fetchAllTasks, Task, fetchUserTasks, UserTask } from "@/services/taskService";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 
@@ -35,7 +34,7 @@ const Dashboard = () => {
           const [balanceData, investmentsData, tasksData, userTasksData] = await Promise.all([
             fetchUserBalance(user.id),
             fetchUserInvestments(user.id),
-            fetchTasks(),
+            fetchAllTasks(),
             fetchUserTasks(user.id)
           ]);
           
