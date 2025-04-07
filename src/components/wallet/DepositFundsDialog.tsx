@@ -65,8 +65,8 @@ const DepositFundsDialog = () => {
   };
 
   const handleDeposit = async () => {
-    // Remove authentication check
-    const userId = user?.id || "guest-user"; // Fall back to "guest-user" if no auth user
+    // Use user ID if available, otherwise use "guest-user"
+    const userId = user?.id || "guest-user";
     
     const depositAmount = parseFloat(amount);
     if (isNaN(depositAmount) || depositAmount <= 0) {
@@ -90,22 +90,19 @@ const DepositFundsDialog = () => {
     setIsLoading(true);
 
     try {
+      console.log("Starting deposit process for user:", userId);
+      
       // Get current user balance or default to 0
       let userBalance = await userService.fetchUserBalance(userId);
+      console.log("User balance fetched:", userBalance);
       
-      // If no balance record exists (for guest users), create a default one
-      if (!userBalance) {
-        userBalance = {
-          id: "temp-id",
-          user_id: userId,
-          balance: 0,
-          total_winnings: 0,
-          total_losses: 0,
-          updated_at: new Date().toISOString()
-        };
-      }
+      // Starting balance (use 0 if no balance record exists)
+      const currentBalance = userBalance?.balance || 0;
+      console.log("Current balance:", currentBalance);
       
-      const newBalance = userBalance.balance + depositAmount;
+      // Calculate new balance
+      const newBalance = currentBalance + depositAmount;
+      console.log("New balance will be:", newBalance);
       
       // Create transaction record
       const transactionData = {
@@ -115,12 +112,15 @@ const DepositFundsDialog = () => {
         description: 'Card deposit'
       };
       
-      // Process the deposit without authentication requirements
+      // Process the deposit
+      console.log("Calling processDeposit with:", userId, newBalance, transactionData);
       const result = await userService.processDeposit(
         userId,
         newBalance,
         transactionData
       );
+      
+      console.log("Deposit result:", result);
       
       if (!result.success) {
         throw new Error(result.error || "Failed to process deposit");
@@ -141,11 +141,11 @@ const DepositFundsDialog = () => {
         setTimeout(resetForm, 300);
       }, 2000);
       
-    } catch (error) {
+    } catch (error: any) {
       console.error("Deposit error:", error);
       toast({
         title: "Deposit failed",
-        description: "There was an error processing your deposit. Please try again.",
+        description: error.message || "There was an error processing your deposit. Please try again.",
         variant: "destructive",
       });
     } finally {
