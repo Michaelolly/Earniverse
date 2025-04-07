@@ -14,7 +14,7 @@ type AuthContextType = {
   }>;
   signUp: (email: string, password: string) => Promise<{
     error: Error | null;
-    data: Session | null;
+    data: { session: Session | null; user: User | null };
   }>;
   signOut: () => Promise<void>;
 };
@@ -72,9 +72,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         password,
       });
       
-      return { data: data.session, error };
+      return { data: { session: data.session, user: data.user }, error };
     } catch (error) {
-      return { data: null, error: error as Error };
+      return { data: { session: null, user: null }, error: error as Error };
     }
   };
 

@@ -199,3 +199,15 @@ export const makeUserAdmin = async (userEmail: string): Promise<{ success: boole
     return { success: false, error: 'An unexpected error occurred' };
   }
 };
+
+// Export as a service object for better imports
+export const userService = {
+  fetchUserProfile,
+  fetchUserBalance,
+  fetchUserTransactions,
+  updateUserProfile,
+  isUserAdmin,
+  fetchAllUsers,
+  fetchAllBalances,
+  makeUserAdmin
+};

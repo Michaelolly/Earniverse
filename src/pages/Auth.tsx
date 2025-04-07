@@ -9,10 +9,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Eye, EyeOff, ArrowRight } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 const Auth = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const { signIn, signUp } = useAuth();
@@ -42,7 +45,19 @@ const Auth = () => {
     e.preventDefault();
     setIsLoading(true);
     
-    const { error } = await signUp(email, password);
+    // Check if all fields are filled
+    if (!firstName || !lastName) {
+      toast({
+        title: "Missing information",
+        description: "Please fill in all required fields",
+        variant: "destructive",
+      });
+      setIsLoading(false);
+      return;
+    }
+    
+    // Sign up with email and password
+    const { error, data } = await signUp(email, password);
     
     if (error) {
       toast({
@@ -51,11 +66,33 @@ const Auth = () => {
         variant: "destructive",
       });
     } else {
-      toast({
-        title: "Success!",
-        description: "Please check your email to confirm your account.",
-      });
-      navigate("/dashboard");
+      // Update profile information
+      if (data?.session?.user) {
+        try {
+          const { error: updateError } = await supabase
+            .from('profiles')
+            .update({
+              username: `${firstName} ${lastName}`,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', data.session.user.id);
+          
+          if (updateError) throw updateError;
+          
+          toast({
+            title: "Success!",
+            description: "Your account has been created successfully.",
+          });
+          navigate("/dashboard");
+        } catch (profileError: any) {
+          console.error("Error updating profile:", profileError);
+          toast({
+            title: "Profile update issue",
+            description: "Account created but failed to save profile details.",
+            variant: "destructive",
+          });
+        }
+      }
     }
     
     setIsLoading(false);
@@ -148,6 +185,32 @@ const Auth = () => {
               <TabsContent value="signup">
                 <form onSubmit={handleSignUp}>
                   <CardContent className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="firstName">First Name</Label>
+                        <Input
+                          id="firstName"
+                          type="text"
+                          placeholder="John"
+                          value={firstName}
+                          onChange={(e) => setFirstName(e.target.value)}
+                          required
+                          className="bg-white/50"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="lastName">Last Name</Label>
+                        <Input
+                          id="lastName"
+                          type="text"
+                          placeholder="Doe"
+                          value={lastName}
+                          onChange={(e) => setLastName(e.target.value)}
+                          required
+                          className="bg-white/50"
+                        />
+                      </div>
+                    </div>
                     <div className="space-y-2">
                       <Label htmlFor="signup-email">Email</Label>
                       <Input
