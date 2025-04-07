@@ -1,3 +1,4 @@
+
 // src/pages/Admin.tsx
 import { useState, useEffect } from 'react';
 import { useAuth } from "@/context/AuthContext";
@@ -24,7 +25,7 @@ const Admin = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm();
+  const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm();
 
   useEffect(() => {
     if (!loading && !user) {
@@ -102,7 +103,7 @@ const Admin = () => {
             <div>
               <Label htmlFor="title">Title</Label>
               <Input id="title" type="text" {...register("title", { required: "Title is required" })} />
-              {errors.title && <p className="text-red-500">{errors.title.message}</p>}
+              {errors.title && <p className="text-red-500">{String(errors.title.message)}</p>}
             </div>
             <div>
               <Label htmlFor="description">Description</Label>
@@ -115,18 +116,18 @@ const Admin = () => {
                 valueAsNumber: true,
                 validate: (value: number) => value > 0 || "Reward must be positive",
               })} />
-              {errors.reward && <p className="text-red-500">{errors.reward.message}</p>}
+              {errors.reward && <p className="text-red-500">{String(errors.reward.message)}</p>}
             </div>
             <div>
               <Label htmlFor="difficulty">Difficulty</Label>
-              <Select>
+              <Select onValueChange={(value) => setValue("difficulty", value)}>
                 <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Select difficulty" {...register("difficulty", { required: "Difficulty is required" })} />
+                  <SelectValue placeholder="Select difficulty" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="easy" {...register("difficulty")}>Easy</SelectItem>
-                  <SelectItem value="medium" {...register("difficulty")}>Medium</SelectItem>
-                  <SelectItem value="hard" {...register("difficulty")}>Hard</SelectItem>
+                  <SelectItem value="easy">Easy</SelectItem>
+                  <SelectItem value="medium">Medium</SelectItem>
+                  <SelectItem value="hard">Hard</SelectItem>
                 </SelectContent>
               </Select>
               {errors.difficulty && <p className="text-red-500">Difficulty is required</p>}
@@ -153,9 +154,12 @@ const Admin = () => {
                     onSelect={(date) => {
                       setSelectedDate(date);
                       // Manually set the expirationDate value in the form
-                      setValue("expirationDate", date);
+                      if (date) {
+                        setValue("expirationDate", date);
+                      }
                     }}
                     initialFocus
+                    className={cn("p-3 pointer-events-auto")}
                   />
                 </PopoverContent>
               </Popover>
