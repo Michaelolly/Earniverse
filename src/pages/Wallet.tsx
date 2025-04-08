@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,6 +19,7 @@ const Wallet = () => {
   const [transactions, setTransactions] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [searchParams, setSearchParams] = useSearchParams();
   
   const userId = user?.id || "guest-user";
 
@@ -52,6 +53,29 @@ const Wallet = () => {
     fetchUserBalance();
     fetchTransactions();
   }, [refreshTrigger, fetchUserBalance, fetchTransactions]);
+
+  useEffect(() => {
+    const paymentStatus = searchParams.get("payment");
+    const paymentAmount = searchParams.get("amount");
+    
+    if (paymentStatus) {
+      const newParams = new URLSearchParams(searchParams);
+      newParams.delete("payment");
+      newParams.delete("session_id");
+      newParams.delete("amount");
+      setSearchParams(newParams);
+      
+      setRefreshTrigger(prev => prev + 1);
+      
+      if (paymentStatus === "canceled") {
+        toast({
+          title: "Payment Canceled",
+          description: "You canceled your payment. No funds were deducted.",
+          variant: "destructive",
+        });
+      }
+    }
+  }, [searchParams, setSearchParams, toast]);
 
   const handleRefresh = () => {
     setIsLoading(true);

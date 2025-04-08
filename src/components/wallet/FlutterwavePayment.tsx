@@ -6,6 +6,7 @@ import { Plus } from "lucide-react";
 import { userService } from "@/services/userService";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
+import { flutterwaveConfig } from "@/integrations/flutterwave/config";
 
 interface FlutterwavePaymentProps {
   amount: string;
@@ -22,7 +23,7 @@ const FlutterwavePayment = ({ amount, onSuccess }: FlutterwavePaymentProps) => {
   const userName = user?.user_metadata?.name || "Guest User";
 
   const handleFlutterwavePayment = useFlutterwave({
-    public_key: "FLWPUBK_TEST-391723225190562db3f51b7c56ec0ac7-X",
+    public_key: flutterwaveConfig.publicKey,
     tx_ref: Date.now().toString(),
     amount: parseFloat(amount) || 10,
     currency: "USD",

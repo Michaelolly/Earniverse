@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,7 +9,9 @@ import { Plus, CreditCard, Check, ChevronsUpDown } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { userService } from "@/services/userService";
 import FlutterwavePayment from "./FlutterwavePayment";
+import StripePayment from "./StripePayment";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useSearchParams } from "react-router-dom";
 
 const DepositFundsDialog = () => {
   const [amount, setAmount] = useState("");
@@ -20,9 +22,37 @@ const DepositFundsDialog = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [open, setOpen] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState("card");
+  const [paymentMethod, setPaymentMethod] = useState("stripe");
   const { toast } = useToast();
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
+
+  // Check for payment success in URL
+  useEffect(() => {
+    const paymentStatus = searchParams.get("payment");
+    const sessionId = searchParams.get("session_id");
+    const paymentAmount = searchParams.get("amount");
+    
+    if (paymentStatus === "success" && sessionId) {
+      setIsSuccess(true);
+      setOpen(true);
+      
+      if (paymentAmount) {
+        setAmount(paymentAmount);
+      }
+
+      // Give time for the success animation to complete
+      setTimeout(() => {
+        setOpen(false);
+        setTimeout(resetForm, 300);
+        
+        toast({
+          title: "Payment Successful",
+          description: `Your payment has been processed successfully.`,
+        });
+      }, 3000);
+    }
+  }, [searchParams, toast]);
 
   const formatCardNumber = (value: string) => {
     // Remove non-numeric characters and limit to 19 digits (16 digits + 3 spaces)
@@ -65,7 +95,7 @@ const DepositFundsDialog = () => {
     setCvv("");
     setCardHolder("");
     setIsSuccess(false);
-    setPaymentMethod("card");
+    setPaymentMethod("stripe");
   };
 
   const handleDeposit = async () => {
@@ -211,12 +241,22 @@ const DepositFundsDialog = () => {
                 </div>
               </div>
 
-              <Tabs defaultValue="flutterwave" onValueChange={setPaymentMethod} className="w-full">
-                <TabsList className="grid grid-cols-2 w-full">
+              <Tabs defaultValue="stripe" onValueChange={setPaymentMethod} className="w-full">
+                <TabsList className="grid grid-cols-3 w-full">
+                  <TabsTrigger value="stripe">Stripe</TabsTrigger>
                   <TabsTrigger value="flutterwave">Flutterwave</TabsTrigger>
-                  <TabsTrigger value="card">Credit Card</TabsTrigger>
+                  <TabsTrigger value="card">Direct Card</TabsTrigger>
                 </TabsList>
                 
+                <TabsContent value="stripe" className="pt-4 space-y-4">
+                  <div className="p-4 border rounded-md bg-muted/30">
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Secure online payment processed by Stripe
+                    </p>
+                    <StripePayment amount={amount} />
+                  </div>
+                </TabsContent>
+
                 <TabsContent value="flutterwave" className="pt-4 space-y-4">
                   <div className="p-4 border rounded-md bg-muted/30">
                     <p className="text-sm text-muted-foreground mb-4">
