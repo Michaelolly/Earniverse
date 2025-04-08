@@ -12,3 +12,9 @@ export const stripeConfig = {
   // Note: Secret key should be stored securely on the server
   // and not exposed in the frontend code.
 };
+
+// Demo payment configuration
+export const demoPaymentConfig = {
+  enabled: true,
+  amounts: [10, 50, 100, 500]
+};

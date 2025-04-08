@@ -2,6 +2,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ArrowUpRight, TrendingUp, Shield, BarChart2, BriefcaseBusiness } from "lucide-react";
+import { Link } from "react-router-dom";
 
 const InvestmentSection = () => {
   return (
@@ -35,9 +36,11 @@ const InvestmentSection = () => {
             </div>
             
             <div className="pt-4">
-              <Button size="lg" className="bg-earniverse-purple hover:bg-earniverse-deep-purple">
-                Start Investing
-              </Button>
+              <Link to="/investments">
+                <Button size="lg" className="bg-earniverse-purple hover:bg-earniverse-deep-purple">
+                  Start Investing
+                </Button>
+              </Link>
             </div>
           </div>
           

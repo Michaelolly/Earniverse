@@ -10,8 +10,10 @@ import { useAuth } from "@/context/AuthContext";
 import { userService } from "@/services/userService";
 import FlutterwavePayment from "./FlutterwavePayment";
 import StripePayment from "./StripePayment";
+import DemoPayment from "./DemoPayment";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSearchParams } from "react-router-dom";
+import { demoPaymentConfig } from "@/integrations/flutterwave/config";
 
 const DepositFundsDialog = () => {
   const [amount, setAmount] = useState("");
@@ -22,7 +24,7 @@ const DepositFundsDialog = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [open, setOpen] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState("stripe");
+  const [paymentMethod, setPaymentMethod] = useState("demo"); // Changed default to demo
   const { toast } = useToast();
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
@@ -95,7 +97,7 @@ const DepositFundsDialog = () => {
     setCvv("");
     setCardHolder("");
     setIsSuccess(false);
-    setPaymentMethod("stripe");
+    setPaymentMethod("demo"); // Reset to demo
   };
 
   const handleDeposit = async () => {
@@ -198,6 +200,22 @@ const DepositFundsDialog = () => {
     }, 2000);
   };
 
+  const handleDemoSuccess = () => {
+    setIsSuccess(true);
+    
+    // After 2 seconds, reset the form and close the dialog
+    setTimeout(() => {
+      setOpen(false);
+      // Wait for the close animation to finish before resetting form
+      setTimeout(resetForm, 300);
+    }, 2000);
+  };
+
+  // Quick amount buttons for demo
+  const handleQuickAmount = (quickAmount: number) => {
+    setAmount(quickAmount.toString());
+  };
+
   return (
     <Dialog open={open} onOpenChange={(newOpen) => {
       setOpen(newOpen);
@@ -241,13 +259,38 @@ const DepositFundsDialog = () => {
                 </div>
               </div>
 
-              <Tabs defaultValue="stripe" onValueChange={setPaymentMethod} className="w-full">
-                <TabsList className="grid grid-cols-3 w-full">
+              <Tabs defaultValue="demo" onValueChange={setPaymentMethod} className="w-full">
+                <TabsList className="grid grid-cols-4 w-full">
+                  <TabsTrigger value="demo">Demo</TabsTrigger>
                   <TabsTrigger value="stripe">Stripe</TabsTrigger>
                   <TabsTrigger value="flutterwave">Flutterwave</TabsTrigger>
                   <TabsTrigger value="card">Direct Card</TabsTrigger>
                 </TabsList>
                 
+                <TabsContent value="demo" className="pt-4 space-y-4">
+                  <div className="p-4 border rounded-md bg-muted/30">
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Quick test payment for demonstration purposes
+                    </p>
+                    
+                    {/* Quick amount buttons */}
+                    <div className="grid grid-cols-4 gap-2 mb-4">
+                      {demoPaymentConfig.amounts.map((quickAmount) => (
+                        <Button 
+                          key={quickAmount} 
+                          variant="outline" 
+                          onClick={() => handleQuickAmount(quickAmount)}
+                          className={amount === quickAmount.toString() ? "border-green-500 bg-green-50" : ""}
+                        >
+                          ${quickAmount}
+                        </Button>
+                      ))}
+                    </div>
+                    
+                    <DemoPayment amount={amount} onSuccess={handleDemoSuccess} />
+                  </div>
+                </TabsContent>
+
                 <TabsContent value="stripe" className="pt-4 space-y-4">
                   <div className="p-4 border rounded-md bg-muted/30">
                     <p className="text-sm text-muted-foreground mb-4">
