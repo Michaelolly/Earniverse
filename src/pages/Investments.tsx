@@ -1,5 +1,5 @@
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import DashboardLayout from "@/components/layout/DashboardLayout";
@@ -23,6 +23,8 @@ import { fetchUserBalance } from "@/services/userService";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
+import RealTimeInvestmentData from "@/components/investments/RealTimeInvestmentData";
+import AddInvestmentModal from "@/components/investments/AddInvestmentModal";
 
 const Investments = () => {
   const { user, loading } = useAuth();
@@ -34,6 +36,7 @@ const Investments = () => {
   const [investmentAmount, setInvestmentAmount] = useState<number>(0);
   const [isInvesting, setIsInvesting] = useState<boolean>(false);
   const [dialogOpen, setDialogOpen] = useState<boolean>(false);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -41,33 +44,33 @@ const Investments = () => {
     }
   }, [user, loading, navigate]);
 
-  useEffect(() => {
+  const loadData = useCallback(async () => {
     if (user) {
-      const loadData = async () => {
-        setIsLoadingData(true);
-        try {
-          const [userInvestments, userBalance] = await Promise.all([
-            fetchUserInvestments(user.id),
-            fetchUserBalance(user.id)
-          ]);
-          
-          setInvestments(userInvestments);
-          setBalance(userBalance?.balance || 0);
-        } catch (error) {
-          console.error("Error loading investment data:", error);
-          toast({
-            title: "Error",
-            description: "Failed to load investment data",
-            variant: "destructive",
-          });
-        } finally {
-          setIsLoadingData(false);
-        }
-      };
-      
-      loadData();
+      setIsLoadingData(true);
+      try {
+        const [userInvestments, userBalance] = await Promise.all([
+          fetchUserInvestments(user.id),
+          fetchUserBalance(user.id)
+        ]);
+        
+        setInvestments(userInvestments);
+        setBalance(userBalance?.balance || 0);
+      } catch (error) {
+        console.error("Error loading investment data:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load investment data",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoadingData(false);
+      }
     }
-  }, [user]);
+  }, [user, toast]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData, refreshTrigger]);
 
   const handleInvestmentSelect = (opportunity: any) => {
     setSelectedOpportunity(opportunity);
@@ -120,19 +123,9 @@ const Investments = () => {
         setDialogOpen(false);
         
         // Refresh data
-        const [userInvestments, userBalance] = await Promise.all([
-          fetchUserInvestments(user.id),
-          fetchUserBalance(user.id)
-        ]);
-        
-        setInvestments(userInvestments);
-        setBalance(userBalance?.balance || 0);
+        setRefreshTrigger(prev => prev + 1);
       } else {
-        toast({
-          title: "Investment Failed",
-          description: result.error || "An error occurred while creating your investment",
-          variant: "destructive",
-        });
+        throw new Error(result.error || "An error occurred while creating your investment");
       }
     } catch (error) {
       console.error("Error creating investment:", error);
@@ -159,19 +152,9 @@ const Investments = () => {
         });
         
         // Refresh data
-        const [userInvestments, userBalance] = await Promise.all([
-          fetchUserInvestments(user.id),
-          fetchUserBalance(user.id)
-        ]);
-        
-        setInvestments(userInvestments);
-        setBalance(userBalance?.balance || 0);
+        setRefreshTrigger(prev => prev + 1);
       } else {
-        toast({
-          title: "Sale Failed",
-          description: result.error || "An error occurred while selling your investment",
-          variant: "destructive",
-        });
+        throw new Error(result.error || "An error occurred while selling your investment");
       }
     } catch (error) {
       console.error("Error selling investment:", error);
@@ -215,6 +198,10 @@ const Investments = () => {
   // Sort investments by current value
   const sortedInvestments = [...investments].sort((a, b) => b.current_value - a.current_value);
 
+  const handleInvestmentAdded = () => {
+    setRefreshTrigger(prev => prev + 1);
+  };
+
   return (
     <DashboardLayout>
       <div className="p-6">
@@ -223,10 +210,7 @@ const Investments = () => {
             <h1 className="text-2xl font-bold">Investment Hub</h1>
             <p className="text-muted-foreground">Grow your wealth with smart investments</p>
           </div>
-          <Button className="bg-earniverse-purple hover:bg-earniverse-deep-purple">
-            <BarChart2 className="mr-2" size={16} />
-            New Investment
-          </Button>
+          <AddInvestmentModal onInvestmentAdded={handleInvestmentAdded} />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
@@ -282,6 +266,11 @@ const Investments = () => {
               </div>
             </CardContent>
           </Card>
+        </div>
+
+        {/* Real-time market data section */}
+        <div className="mb-8">
+          <RealTimeInvestmentData />
         </div>
 
         <Tabs defaultValue="portfolio" className="mb-8">

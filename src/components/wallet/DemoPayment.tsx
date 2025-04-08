@@ -5,7 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { userService } from "@/services/userService";
 import { demoPaymentConfig } from "@/integrations/flutterwave/config";
-import { Coins } from "lucide-react";
+import { Coins, Loader2 } from "lucide-react";
 
 interface DemoPaymentProps {
   amount: string;
@@ -32,6 +32,11 @@ const DemoPayment = ({ amount, onSuccess }: DemoPaymentProps) => {
         });
         setIsProcessing(false);
         return;
+      }
+
+      // Simulate processing time for better UX
+      if (demoPaymentConfig.processingDelay) {
+        await new Promise(resolve => setTimeout(resolve, demoPaymentConfig.processingDelay));
       }
 
       // Get current user balance or default to 0
@@ -84,7 +89,10 @@ const DemoPayment = ({ amount, onSuccess }: DemoPaymentProps) => {
       className="w-full bg-green-600 hover:bg-green-700 text-white gap-2"
     >
       {isProcessing ? (
-        "Processing..."
+        <>
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Processing...
+        </>
       ) : (
         <>
           <Coins size={16} />

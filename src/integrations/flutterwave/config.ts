@@ -16,5 +16,17 @@ export const stripeConfig = {
 // Demo payment configuration
 export const demoPaymentConfig = {
   enabled: true,
-  amounts: [10, 50, 100, 500]
+  amounts: [10, 50, 100, 500],
+  // Process speed in ms - set to 0 for immediate processing
+  processingDelay: 500
+};
+
+// Investment data configuration
+export const investmentConfig = {
+  cryptoRefreshInterval: 60000, // 1 minute refresh interval
+  stockRefreshInterval: 300000, // 5 minute refresh interval
+  apiEndpoints: {
+    crypto: 'https://api.coingecko.com/api/v3',
+    stocks: 'https://finnhub.io/api/v1'
+  }
 };
