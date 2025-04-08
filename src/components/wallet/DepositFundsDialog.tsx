@@ -5,9 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, CreditCard, Check } from "lucide-react";
+import { Plus, CreditCard, Check, ChevronsUpDown } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { userService } from "@/services/userService";
+import FlutterwavePayment from "./FlutterwavePayment";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const DepositFundsDialog = () => {
   const [amount, setAmount] = useState("");
@@ -18,6 +20,7 @@ const DepositFundsDialog = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [open, setOpen] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState("card");
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -62,6 +65,7 @@ const DepositFundsDialog = () => {
     setCvv("");
     setCardHolder("");
     setIsSuccess(false);
+    setPaymentMethod("card");
   };
 
   const handleDeposit = async () => {
@@ -153,6 +157,17 @@ const DepositFundsDialog = () => {
     }
   };
 
+  const handleFlutterwaveSuccess = () => {
+    setIsSuccess(true);
+    
+    // After 2 seconds, reset the form and close the dialog
+    setTimeout(() => {
+      setOpen(false);
+      // Wait for the close animation to finish before resetting form
+      setTimeout(resetForm, 300);
+    }, 2000);
+  };
+
   return (
     <Dialog open={open} onOpenChange={(newOpen) => {
       setOpen(newOpen);
@@ -161,7 +176,7 @@ const DepositFundsDialog = () => {
       }
     }}>
       <DialogTrigger asChild>
-        <Button className="bg-earniverse-gold hover:bg-earniverse-royal-gold text-black gap-2">
+        <Button className="bg-earniverse-gold hover:bg-earniverse-royal-gold text-black gap-2" data-dialog-trigger="deposit">
           <Plus size={16} />
           Add Funds
         </Button>
@@ -172,9 +187,10 @@ const DepositFundsDialog = () => {
             <DialogHeader>
               <DialogTitle>Deposit Funds</DialogTitle>
               <DialogDescription>
-                Add money to your wallet. This is a simulation for educational purposes.
+                Add money to your wallet. Choose your preferred payment method.
               </DialogDescription>
             </DialogHeader>
+            
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="amount" className="text-right">
@@ -194,67 +210,89 @@ const DepositFundsDialog = () => {
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="cardHolder" className="text-right">
-                  Card holder
-                </Label>
-                <div className="col-span-3">
-                  <Input
-                    id="cardHolder"
-                    type="text"
-                    placeholder="John Doe"
-                    value={cardHolder}
-                    onChange={(e) => setCardHolder(e.target.value)}
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="cardNumber" className="text-right">
-                  Card number
-                </Label>
-                <div className="col-span-3">
-                  <Input
-                    id="cardNumber"
-                    type="text"
-                    placeholder="0000 0000 0000 0000"
-                    value={cardNumber}
-                    onChange={handleCardNumberChange}
-                    maxLength={19}
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="expiry" className="text-right">
-                  Expiry
-                </Label>
-                <Input
-                  id="expiry"
-                  type="text"
-                  placeholder="MM/YY"
-                  value={expiryDate}
-                  onChange={handleExpiryDateChange}
-                  maxLength={5}
-                  className="col-span-1"
-                />
-                <Label htmlFor="cvv" className="text-right">
-                  CVV
-                </Label>
-                <Input
-                  id="cvv"
-                  type="text"
-                  placeholder="123"
-                  value={cvv}
-                  onChange={handleCvvChange}
-                  maxLength={3}
-                  className="col-span-1"
-                />
-              </div>
+
+              <Tabs defaultValue="flutterwave" onValueChange={setPaymentMethod} className="w-full">
+                <TabsList className="grid grid-cols-2 w-full">
+                  <TabsTrigger value="flutterwave">Flutterwave</TabsTrigger>
+                  <TabsTrigger value="card">Credit Card</TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="flutterwave" className="pt-4 space-y-4">
+                  <div className="p-4 border rounded-md bg-muted/30">
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Secure online payment processed by Flutterwave
+                    </p>
+                    <FlutterwavePayment amount={amount} onSuccess={handleFlutterwaveSuccess} />
+                  </div>
+                </TabsContent>
+                
+                <TabsContent value="card" className="space-y-4">
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="cardHolder" className="text-right">
+                      Card holder
+                    </Label>
+                    <div className="col-span-3">
+                      <Input
+                        id="cardHolder"
+                        type="text"
+                        placeholder="John Doe"
+                        value={cardHolder}
+                        onChange={(e) => setCardHolder(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="cardNumber" className="text-right">
+                      Card number
+                    </Label>
+                    <div className="col-span-3">
+                      <Input
+                        id="cardNumber"
+                        type="text"
+                        placeholder="0000 0000 0000 0000"
+                        value={cardNumber}
+                        onChange={handleCardNumberChange}
+                        maxLength={19}
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="expiry" className="text-right">
+                      Expiry
+                    </Label>
+                    <Input
+                      id="expiry"
+                      type="text"
+                      placeholder="MM/YY"
+                      value={expiryDate}
+                      onChange={handleExpiryDateChange}
+                      maxLength={5}
+                      className="col-span-1"
+                    />
+                    <Label htmlFor="cvv" className="text-right">
+                      CVV
+                    </Label>
+                    <Input
+                      id="cvv"
+                      type="text"
+                      placeholder="123"
+                      value={cvv}
+                      onChange={handleCvvChange}
+                      maxLength={3}
+                      className="col-span-1"
+                    />
+                  </div>
+                </TabsContent>
+              </Tabs>
             </div>
-            <DialogFooter>
-              <Button type="submit" onClick={handleDeposit} disabled={isLoading}>
-                {isLoading ? "Processing..." : "Deposit"}
-              </Button>
-            </DialogFooter>
+            
+            {paymentMethod === "card" && (
+              <DialogFooter>
+                <Button type="submit" onClick={handleDeposit} disabled={isLoading}>
+                  {isLoading ? "Processing..." : "Deposit"}
+                </Button>
+              </DialogFooter>
+            )}
           </>
         ) : (
           <div className="flex flex-col items-center justify-center py-8 text-center">
