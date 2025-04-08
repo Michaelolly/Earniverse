@@ -40,7 +40,7 @@ const DemoPayment = ({ amount, onSuccess }: DemoPaymentProps) => {
       }
 
       // Get current user balance or default to 0
-      let userBalance = await userService.fetchUserBalance(userId);
+      const userBalance = await userService.fetchUserBalance(userId);
       const currentBalance = userBalance?.balance || 0;
       
       // Calculate new balance

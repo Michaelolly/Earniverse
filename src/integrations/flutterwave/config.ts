@@ -23,10 +23,11 @@ export const demoPaymentConfig = {
 
 // Investment data configuration
 export const investmentConfig = {
-  cryptoRefreshInterval: 60000, // 1 minute refresh interval
+  cryptoRefreshInterval: 30000, // 30 seconds refresh interval
   stockRefreshInterval: 300000, // 5 minute refresh interval
   apiEndpoints: {
-    crypto: 'https://api.coingecko.com/api/v3',
+    crypto: 'https://api.bitget.com',
     stocks: 'https://finnhub.io/api/v1'
-  }
+  },
+  cryptoSymbols: ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'ADAUSDT', 'BNBUSDT']
 };
