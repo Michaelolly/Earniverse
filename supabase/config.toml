@@ -84,9 +84,3 @@ verify_jwt = false
 verify_jwt = false
 [functions.update_balance_after_game]
 verify_jwt = false
-
-# Configure Supabase CLI workflow.
-[dev]
-# Commands to run when running `supabase start`.
-#
-# start = "yarn start"
