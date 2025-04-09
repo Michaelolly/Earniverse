@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
@@ -24,6 +25,7 @@ const Wallet = () => {
   const userId = user?.id || "guest-user";
 
   const fetchUserBalance = useCallback(async () => {
+    setIsLoading(true);
     try {
       const data = await userService.fetchUserBalance(userId);
       
@@ -35,6 +37,8 @@ const Wallet = () => {
     } catch (error) {
       console.error("Error fetching balance:", error);
       setBalance(0);
+    } finally {
+      setIsLoading(false);
     }
   }, [userId]);
 
@@ -44,15 +48,21 @@ const Wallet = () => {
       setTransactions(data || []);
     } catch (error) {
       console.error("Error fetching transactions:", error);
-    } finally {
-      setIsLoading(false);
     }
   }, [userId]);
 
+  // Combined fetch function to ensure both data fetches happen together
+  const fetchWalletData = useCallback(() => {
+    setIsLoading(true);
+    Promise.all([
+      fetchUserBalance(),
+      fetchTransactions()
+    ]).finally(() => setIsLoading(false));
+  }, [fetchUserBalance, fetchTransactions]);
+
   useEffect(() => {
-    fetchUserBalance();
-    fetchTransactions();
-  }, [refreshTrigger, fetchUserBalance, fetchTransactions]);
+    fetchWalletData();
+  }, [refreshTrigger, fetchWalletData]);
 
   useEffect(() => {
     const paymentStatus = searchParams.get("payment");
@@ -78,7 +88,11 @@ const Wallet = () => {
   }, [searchParams, setSearchParams, toast]);
 
   const handleRefresh = () => {
-    setIsLoading(true);
+    setRefreshTrigger(prev => prev + 1);
+  };
+
+  const handleDepositSuccess = () => {
+    // Refresh the wallet data after successful deposit
     setRefreshTrigger(prev => prev + 1);
   };
 
@@ -89,7 +103,7 @@ const Wallet = () => {
     });
   };
 
-  if (isLoading) {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-earniverse-gold"></div>
@@ -105,7 +119,7 @@ const Wallet = () => {
             <h1 className="text-2xl font-bold">Wallet</h1>
             <p className="text-muted-foreground">Manage your funds and transactions</p>
           </div>
-          <DepositFundsDialog />
+          <DepositFundsDialog onDepositSuccess={handleDepositSuccess} />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -114,7 +128,11 @@ const Wallet = () => {
               <div className="flex flex-col md:flex-row justify-between gap-6">
                 <div>
                   <p className="text-sm text-muted-foreground mb-1">Available Balance</p>
-                  <p className="text-3xl font-bold mb-4">${balance !== null ? balance.toFixed(2) : "0.00"}</p>
+                  {isLoading ? (
+                    <div className="h-10 w-32 bg-gray-200 animate-pulse rounded"></div>
+                  ) : (
+                    <p className="text-3xl font-bold mb-4">${balance !== null ? balance.toFixed(2) : "0.00"}</p>
+                  )}
                   <div className="flex flex-wrap gap-2">
                     <Button onClick={handleWithdraw} size="sm" className="gap-1">
                       <ArrowUpRight size={14} />

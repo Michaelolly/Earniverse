@@ -15,7 +15,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSearchParams } from "react-router-dom";
 import { demoPaymentConfig } from "@/integrations/flutterwave/config";
 
-const DepositFundsDialog = () => {
+interface DepositFundsDialogProps {
+  onDepositSuccess?: () => void;
+}
+
+const DepositFundsDialog = ({ onDepositSuccess }: DepositFundsDialogProps) => {
   const [amount, setAmount] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
@@ -44,13 +48,17 @@ const DepositFundsDialog = () => {
         setOpen(false);
         setTimeout(resetForm, 300);
         
+        if (onDepositSuccess) {
+          onDepositSuccess();
+        }
+        
         toast({
           title: "Payment Successful",
           description: `Your payment has been processed successfully.`,
         });
       }, 3000);
     }
-  }, [searchParams, toast]);
+  }, [searchParams, toast, onDepositSuccess]);
 
   const resetForm = () => {
     setAmount("");
@@ -66,6 +74,10 @@ const DepositFundsDialog = () => {
       setOpen(false);
       // Wait for the close animation to finish before resetting form
       setTimeout(resetForm, 300);
+      
+      if (onDepositSuccess) {
+        onDepositSuccess();
+      }
     }, 2000);
   };
 
@@ -76,7 +88,13 @@ const DepositFundsDialog = () => {
     setTimeout(() => {
       setOpen(false);
       // Wait for the close animation to finish before resetting form
-      setTimeout(resetForm, 300);
+      setTimeout(() => {
+        resetForm();
+        
+        if (onDepositSuccess) {
+          onDepositSuccess();
+        }
+      }, 300);
     }, 2000);
   };
 
