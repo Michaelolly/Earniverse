@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -6,7 +7,7 @@ import { investmentConfig } from "@/integrations/flutterwave/config";
 import { Loader2, TrendingUp, TrendingDown, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { fetchBitgetTicker, generateMockHistoricalData, formatCryptoName, BitgetTicker, CryptoAssetData } from "@/services/bitgetService";
+import { fetchBitgetTicker, generateMockHistoricalData, formatCryptoName, BitgetTicker, CryptoAssetData, BitgetHistoricalData } from "@/services/bitgetService";
 
 // Define crypto symbols to track
 const CRYPTO_SYMBOLS: Record<string, { id: string; symbol: string }> = {
@@ -16,8 +17,17 @@ const CRYPTO_SYMBOLS: Record<string, { id: string; symbol: string }> = {
   "ADAUSDT": { id: "cardano", symbol: "ADA" }
 };
 
+// Define sample stock data structure (same as CryptoAssetData)
+interface StockAssetData {
+  symbol: string;
+  name: string;
+  current_price: number;
+  price_change_percentage_24h: number;
+  sparkline_data: BitgetHistoricalData[];
+}
+
 // Define sample stock data
-const SAMPLE_STOCK_DATA: Record<string, any> = {
+const SAMPLE_STOCK_DATA: Record<string, StockAssetData> = {
   "AAPL": {
     symbol: "AAPL",
     name: "Apple Inc.",
@@ -63,7 +73,7 @@ const SAMPLE_STOCK_DATA: Record<string, any> = {
 const RealTimeInvestmentData = () => {
   const [activeTab, setActiveTab] = useState("crypto");
   const [cryptoData, setCryptoData] = useState<Record<string, CryptoAssetData>>({});
-  const [stockData, setStockData] = useState<any>(SAMPLE_STOCK_DATA);
+  const [stockData, setStockData] = useState<Record<string, StockAssetData>>(SAMPLE_STOCK_DATA);
   const [selectedAsset, setSelectedAsset] = useState<string>("");
   const [loading, setLoading] = useState(true);
   
@@ -250,7 +260,7 @@ const RealTimeInvestmentData = () => {
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <div>
-                        <h3 className="text-lg font-semibold">{selectedAssetData.name} ({selectedAssetData.symbol})</h3>
+                        <h3 className="text-lg font-semibold">{selectedAssetData.name} ({activeTab === "crypto" ? (selectedAssetData as CryptoAssetData).symbol : (selectedAssetData as StockAssetData).symbol})</h3>
                         <p className="text-2xl font-bold">${selectedAssetData.current_price.toFixed(2)}</p>
                       </div>
                       <div className={`flex items-center ${selectedAssetData.price_change_percentage_24h >= 0 ? 'text-green-600' : 'text-red-600'}`}>
@@ -324,7 +334,7 @@ const RealTimeInvestmentData = () => {
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="text-lg font-semibold">{selectedAssetData.name} ({selectedAssetData.symbol})</h3>
+                    <h3 className="text-lg font-semibold">{selectedAssetData.name} ({activeTab === "crypto" ? (selectedAssetData as CryptoAssetData).symbol : (selectedAssetData as StockAssetData).symbol})</h3>
                     <p className="text-2xl font-bold">${selectedAssetData.current_price.toFixed(2)}</p>
                   </div>
                   <div className={`flex items-center ${selectedAssetData.price_change_percentage_24h >= 0 ? 'text-green-600' : 'text-red-600'}`}>
