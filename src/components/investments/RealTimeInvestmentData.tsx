@@ -7,7 +7,15 @@ import { investmentConfig } from "@/integrations/flutterwave/config";
 import { Loader2, TrendingUp, TrendingDown, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { fetchBitgetTicker, generateMockHistoricalData, formatCryptoName, BitgetTicker, CryptoAssetData, BitgetHistoricalData } from "@/services/bitgetService";
+import { 
+  fetchCryptoData, 
+  fetchCryptoHistorical,
+  generateMockHistoricalData, 
+  formatCryptoName, 
+  CoinMarketCapTicker, 
+  CryptoAssetData, 
+  BitgetHistoricalData 
+} from "@/services/bitgetService";
 
 // Define crypto symbols to track
 const CRYPTO_SYMBOLS: Record<string, { id: string; symbol: string }> = {
@@ -17,7 +25,7 @@ const CRYPTO_SYMBOLS: Record<string, { id: string; symbol: string }> = {
   "ADAUSDT": { id: "cardano", symbol: "ADA" }
 };
 
-// Define sample stock data structure (same as CryptoAssetData)
+// Define sample stock data structure
 interface StockAssetData {
   symbol: string;
   name: string;
@@ -77,27 +85,28 @@ const RealTimeInvestmentData = () => {
   const [selectedAsset, setSelectedAsset] = useState<string>("");
   const [loading, setLoading] = useState(true);
   
-  // Function to fetch real-time crypto data from Bitget
-  const fetchCryptoData = useCallback(async () => {
+  // Function to fetch real-time crypto data from CoinMarketCap
+  const fetchCryptoMarketData = useCallback(async () => {
     setLoading(true);
     
     try {
       const cryptoEntries = await Promise.all(
         Object.entries(CRYPTO_SYMBOLS).map(async ([symbol, info]) => {
-          const ticker = await fetchBitgetTicker(symbol);
+          // Fetch current price data
+          const ticker = await fetchCryptoData(symbol);
           
           if (ticker) {
-            const currentPrice = parseFloat(ticker.lastPr);
-            const openPrice = parseFloat(ticker.openUtc);
-            const priceChangePercentage = ((currentPrice - openPrice) / openPrice) * 100;
+            // Fetch historical data for this cryptocurrency
+            const historicalData = await fetchCryptoHistorical(symbol) || 
+              generateMockHistoricalData(ticker.quote.USD.price);
             
             const assetData: CryptoAssetData = {
               id: info.id,
-              name: formatCryptoName(symbol),
-              symbol: info.symbol,
-              current_price: currentPrice,
-              price_change_percentage_24h: priceChangePercentage,
-              sparkline_data: generateMockHistoricalData(currentPrice, 24, 0.05)
+              name: ticker.name,
+              symbol: ticker.symbol,
+              current_price: ticker.quote.USD.price,
+              price_change_percentage_24h: ticker.quote.USD.percent_change_24h,
+              sparkline_data: historicalData
             };
             
             return [symbol, assetData] as [string, CryptoAssetData];
@@ -130,17 +139,17 @@ const RealTimeInvestmentData = () => {
   
   // Initial data fetch
   useEffect(() => {
-    fetchCryptoData();
+    fetchCryptoMarketData();
     
     // Set up auto-refresh for crypto data
     const refreshInterval = setInterval(() => {
       if (activeTab === "crypto") {
-        fetchCryptoData();
+        fetchCryptoMarketData();
       }
     }, investmentConfig.cryptoRefreshInterval);
     
     return () => clearInterval(refreshInterval);
-  }, [fetchCryptoData, activeTab]);
+  }, [fetchCryptoMarketData, activeTab]);
   
   // Handle tab change
   const handleTabChange = (value: string) => {
@@ -160,7 +169,7 @@ const RealTimeInvestmentData = () => {
   
   const manualRefresh = () => {
     if (activeTab === "crypto") {
-      fetchCryptoData();
+      fetchCryptoMarketData();
     } else {
       setLoading(true);
       setTimeout(() => {

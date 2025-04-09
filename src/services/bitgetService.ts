@@ -1,21 +1,19 @@
 
 import { supabase } from "@/integrations/supabase/client";
 
-export interface BitgetTicker {
+export interface CoinMarketCapTicker {
+  id: number;
+  name: string;
   symbol: string;
-  high24h: string;
-  low24h: string;
-  lastPr: string;
-  askPr: string;
-  bidPr: string;
-  baseVolume: string;
-  quoteVolume: string;
-  ts: number;
-  usdtVolume: string;
-  openUtc: string;
-  chgUtc: string;
-  bidSz: string;
-  askSz: string;
+  quote: {
+    USD: {
+      price: number;
+      percent_change_24h: number;
+      volume_24h: number;
+      market_cap: number;
+      last_updated: string;
+    }
+  }
 }
 
 export interface BitgetHistoricalData {
@@ -32,14 +30,14 @@ export interface CryptoAssetData {
   sparkline_data: BitgetHistoricalData[];
 }
 
-export const fetchBitgetTicker = async (symbol: string): Promise<BitgetTicker | null> => {
+export const fetchCryptoData = async (symbol: string): Promise<CoinMarketCapTicker | null> => {
   try {
-    const { data, error } = await supabase.functions.invoke('bitget-market-data', {
+    const { data, error } = await supabase.functions.invoke('coinmarketcap-data', {
       body: { symbol: symbol },
     });
 
     if (error) {
-      console.error('Error fetching Bitget market data:', error);
+      console.error('Error fetching CoinMarketCap data:', error);
       return null;
     }
     
@@ -49,8 +47,32 @@ export const fetchBitgetTicker = async (symbol: string): Promise<BitgetTicker | 
     
     return null;
   } catch (error) {
-    console.error('Error in Bitget API call:', error);
+    console.error('Error in CoinMarketCap API call:', error);
     return null;
+  }
+};
+
+export const fetchCryptoHistorical = async (symbol: string): Promise<BitgetHistoricalData[] | null> => {
+  try {
+    const { data, error } = await supabase.functions.invoke('coinmarketcap-historical', {
+      body: { symbol: symbol },
+    });
+
+    if (error) {
+      console.error('Error fetching CoinMarketCap historical data:', error);
+      return null;
+    }
+    
+    if (data?.data) {
+      return data.data;
+    }
+    
+    // If API fails, return mock data
+    return generateMockHistoricalData(1000);
+  } catch (error) {
+    console.error('Error in CoinMarketCap historical API call:', error);
+    // Return mock data as fallback
+    return generateMockHistoricalData(1000);
   }
 };
 

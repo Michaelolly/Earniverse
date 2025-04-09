@@ -3,3 +3,9 @@ project_id = "fghuralujkiddeuncyml"
 
 [functions.bitget-market-data]
 verify_jwt = false
+
+[functions.coinmarketcap-data]
+verify_jwt = false
+
+[functions.coinmarketcap-historical]
+verify_jwt = false
