@@ -28,26 +28,47 @@ serve(async (req) => {
       .eq("user_id", p_user_id)
       .single();
     
-    if (balanceError) {
+    if (balanceError && balanceError.code !== 'PGRST116') {
       throw new Error(`Failed to fetch balance: ${balanceError.message}`);
     }
 
-    const newBalance = balanceData.balance + p_amount;
+    const currentBalance = balanceData?.balance || 0;
+    const newBalance = currentBalance + p_amount;
 
-    // Start a transaction to update balance and create a transaction record
-    // 1. Update user balance
-    const { error: updateBalanceError } = await supabaseClient
-      .from("user_balances")
-      .update({ balance: newBalance })
-      .eq("user_id", p_user_id);
-    
-    if (updateBalanceError) {
-      throw new Error(`Failed to update balance: ${updateBalanceError.message}`);
+    console.log(`Current balance: $${currentBalance}, New balance: $${newBalance}`);
+
+    // Check if user balance record exists
+    if (!balanceData) {
+      // Create new balance record
+      const { error: insertError } = await supabaseClient
+        .from('user_balances')
+        .insert({
+          user_id: p_user_id,
+          balance: p_amount,
+          updated_at: new Date().toISOString()
+        });
+
+      if (insertError) {
+        throw new Error(`Error creating balance record: ${insertError.message}`);
+      }
+    } else {
+      // Update existing balance
+      const { error: updateError } = await supabaseClient
+        .from('user_balances')
+        .update({ 
+          balance: newBalance,
+          updated_at: new Date().toISOString()
+        })
+        .eq('user_id', p_user_id);
+
+      if (updateError) {
+        throw new Error(`Error updating balance: ${updateError.message}`);
+      }
     }
 
-    // 2. Create transaction record
+    // Create transaction record
     const { error: transactionError } = await supabaseClient
-      .from("transactions")
+      .from('transactions')
       .insert({
         user_id: p_user_id,
         amount: p_amount,
@@ -60,7 +81,7 @@ serve(async (req) => {
       throw new Error(`Failed to create transaction record: ${transactionError.message}`);
     }
 
-    // 3. Update totals based on win/loss
+    // Update totals based on win/loss
     if (p_amount > 0) {
       // Update total winnings
       await supabaseClient
