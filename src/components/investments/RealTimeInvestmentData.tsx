@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -7,10 +6,10 @@ import { investmentConfig } from "@/integrations/flutterwave/config";
 import { Loader2, TrendingUp, TrendingDown, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { fetchBitgetTicker, generateMockHistoricalData, formatCryptoName, BitgetTicker } from "@/services/bitgetService";
+import { fetchBitgetTicker, generateMockHistoricalData, formatCryptoName, BitgetTicker, CryptoAssetData } from "@/services/bitgetService";
 
 // Define crypto symbols to track
-const CRYPTO_SYMBOLS = {
+const CRYPTO_SYMBOLS: Record<string, { id: string; symbol: string }> = {
   "BTCUSDT": { id: "bitcoin", symbol: "BTC" },
   "ETHUSDT": { id: "ethereum", symbol: "ETH" },
   "SOLUSDT": { id: "solana", symbol: "SOL" },
@@ -18,7 +17,7 @@ const CRYPTO_SYMBOLS = {
 };
 
 // Define sample stock data
-const SAMPLE_STOCK_DATA = {
+const SAMPLE_STOCK_DATA: Record<string, any> = {
   "AAPL": {
     symbol: "AAPL",
     name: "Apple Inc.",
@@ -63,7 +62,7 @@ const SAMPLE_STOCK_DATA = {
 
 const RealTimeInvestmentData = () => {
   const [activeTab, setActiveTab] = useState("crypto");
-  const [cryptoData, setCryptoData] = useState<Record<string, any>>({});
+  const [cryptoData, setCryptoData] = useState<Record<string, CryptoAssetData>>({});
   const [stockData, setStockData] = useState<any>(SAMPLE_STOCK_DATA);
   const [selectedAsset, setSelectedAsset] = useState<string>("");
   const [loading, setLoading] = useState(true);
@@ -82,24 +81,23 @@ const RealTimeInvestmentData = () => {
             const openPrice = parseFloat(ticker.openUtc);
             const priceChangePercentage = ((currentPrice - openPrice) / openPrice) * 100;
             
-            return [
-              symbol, 
-              {
-                id: info.id,
-                name: formatCryptoName(symbol),
-                symbol: info.symbol,
-                current_price: currentPrice,
-                price_change_percentage_24h: priceChangePercentage,
-                sparkline_data: generateMockHistoricalData(currentPrice, 24, 0.05)
-              }
-            ];
+            const assetData: CryptoAssetData = {
+              id: info.id,
+              name: formatCryptoName(symbol),
+              symbol: info.symbol,
+              current_price: currentPrice,
+              price_change_percentage_24h: priceChangePercentage,
+              sparkline_data: generateMockHistoricalData(currentPrice, 24, 0.05)
+            };
+            
+            return [symbol, assetData] as [string, CryptoAssetData];
           }
           
           return null;
         })
       );
       
-      const newCryptoData: Record<string, any> = {};
+      const newCryptoData: Record<string, CryptoAssetData> = {};
       cryptoEntries.filter(Boolean).forEach(entry => {
         if (entry) {
           const [symbol, data] = entry;
@@ -228,7 +226,7 @@ const RealTimeInvestmentData = () => {
             ) : (
               <>
                 <div className="grid grid-cols-4 gap-2">
-                  {Object.entries(cryptoData).map(([id, asset]: [string, any]) => (
+                  {Object.entries(cryptoData).map(([id, asset]) => (
                     <Button 
                       key={id}
                       variant={selectedAsset === id ? "default" : "outline"}
@@ -302,7 +300,7 @@ const RealTimeInvestmentData = () => {
           
           <TabsContent value="stocks" className="space-y-4">
             <div className="grid grid-cols-4 gap-2">
-              {Object.entries(stockData).map(([symbol, asset]: [string, any]) => (
+              {Object.entries(stockData).map(([symbol, asset]) => (
                 <Button 
                   key={symbol}
                   variant={selectedAsset === symbol ? "default" : "outline"}

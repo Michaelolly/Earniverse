@@ -23,6 +23,15 @@ export interface BitgetHistoricalData {
   price: number;
 }
 
+export interface CryptoAssetData {
+  id: string;
+  name: string;
+  symbol: string;
+  current_price: number;
+  price_change_percentage_24h: number;
+  sparkline_data: BitgetHistoricalData[];
+}
+
 export const fetchBitgetTicker = async (symbol: string): Promise<BitgetTicker | null> => {
   try {
     const { data, error } = await supabase.functions.invoke('bitget-market-data', {
