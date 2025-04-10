@@ -34,18 +34,15 @@ const AviatorGame: React.FC<AviatorGameProps> = ({ onGameComplete }) => {
   const [playersCount] = useState(Math.floor(Math.random() * 100) + 30); // Mock data
   const { playSound, stopSound, muted, toggleMute } = useAviatorSounds();
 
-  // For visual feedback
   const [countingUp, setCountingUp] = useState(false);
   const [displayedMultiplier, setDisplayedMultiplier] = useState("1.00x");
   
-  // Fetch user balance
   useEffect(() => {
     if (user) {
       fetchUserBalance(user.id).then((data) => {
         if (data) {
           setBalance(data.balance);
         } else {
-          // Fallback to edge function if direct DB access fails
           console.log("Fetching balance via edge function");
           fetch(`https://fghuralujkiddeuncyml.supabase.co/functions/v1/get_user_balance`, {
             method: 'POST',
@@ -72,7 +69,6 @@ const AviatorGame: React.FC<AviatorGameProps> = ({ onGameComplete }) => {
     }
   }, [user]);
 
-  // Game loop
   useEffect(() => {
     if (!isPlaying) return;
     
@@ -80,9 +76,7 @@ const AviatorGame: React.FC<AviatorGameProps> = ({ onGameComplete }) => {
     
     if (shouldContinueGame(multiplier, crashPoint)) {
       interval = setInterval(() => {
-        // Exponential growth for the multiplier to make it more exciting
         setMultiplier(prev => {
-          // More rapid growth at higher values
           const increment = prev < 2 ? 0.01 : prev < 10 ? 0.05 : 0.1;
           return Math.min(prev + increment, MAX_MULTIPLIER);
         });
@@ -99,13 +93,11 @@ const AviatorGame: React.FC<AviatorGameProps> = ({ onGameComplete }) => {
         playSound('crash');
       }
       
-      // Add to history
       setGameHistory(prev => [
         { multiplier: crashPoint, color: getMultiplierColor(crashPoint) },
         ...prev.slice(0, 9)
       ]);
       
-      // Reset after delay
       setTimeout(() => {
         resetGame();
       }, 3000);
@@ -114,7 +106,6 @@ const AviatorGame: React.FC<AviatorGameProps> = ({ onGameComplete }) => {
     return () => clearInterval(interval);
   }, [isPlaying, multiplier, crashPoint, hasBet, cashedOut, playSound]);
 
-  // Update displayed multiplier with counting animation
   useEffect(() => {
     if (isPlaying) {
       setCountingUp(true);
@@ -129,7 +120,7 @@ const AviatorGame: React.FC<AviatorGameProps> = ({ onGameComplete }) => {
     setCashedOut(false);
     setWinAmount(0);
   }, []);
-  
+
   const startNewGame = useCallback(() => {
     if (!user) {
       toast({
@@ -141,18 +132,16 @@ const AviatorGame: React.FC<AviatorGameProps> = ({ onGameComplete }) => {
     }
 
     resetGame();
-    // Generate new crash point (between 1.0 and MAX_MULTIPLIER)
     const newCrashPoint = generateCrashPoint(0.05);
     console.log("Game will crash at:", newCrashPoint);
     setCrashPoint(newCrashPoint);
     
-    // Start the game timer with a countdown
     setTimeout(() => {
       setIsPlaying(true);
       playSound('takeoff');
     }, 2000);
   }, [user, resetGame, playSound]);
-  
+
   const placeBet = useCallback(() => {
     if (!user) {
       toast({
@@ -188,12 +177,11 @@ const AviatorGame: React.FC<AviatorGameProps> = ({ onGameComplete }) => {
     setHasBet(true);
     playSound('bet');
     
-    // Deduct bet from balance immediately for better UX
     if (balance !== null) {
       setBalance(balance - betAmount);
     }
   }, [user, isPlaying, startNewGame, betAmount, balance, playSound]);
-  
+
   const cashOut = useCallback(() => {
     if (!hasBet || cashedOut) return;
     
@@ -208,7 +196,6 @@ const AviatorGame: React.FC<AviatorGameProps> = ({ onGameComplete }) => {
     
     playSound('cashout');
     
-    // Update balance with winnings
     if (balance !== null) {
       setBalance(balance + winnings);
     }
@@ -235,18 +222,13 @@ const AviatorGame: React.FC<AviatorGameProps> = ({ onGameComplete }) => {
       
       <CardContent className="p-4">
         <div className="relative h-80 bg-gradient-to-b from-blue-950 to-purple-950 rounded-lg overflow-hidden">
-          {/* Game canvas with particles */}
           <AviatorParticles isFlying={isPlaying} isCrashed={isCrashed} />
-          
-          {/* Airplane component */}
           <Airplane 
             isFlying={isPlaying} 
             isCrashed={isCrashed} 
             multiplier={multiplier} 
             maxMultiplier={MAX_MULTIPLIER} 
           />
-          
-          {/* Game UI */}
           <div className="absolute inset-0 flex flex-col items-center justify-center">
             <div className={`text-6xl font-bold mb-4 transition-all ${getMultiplierColor(multiplier)}`}>
               {displayedMultiplier}
@@ -271,7 +253,6 @@ const AviatorGame: React.FC<AviatorGameProps> = ({ onGameComplete }) => {
             )}
           </div>
           
-          {/* Game stats */}
           <div className="absolute top-2 left-2 right-2 flex justify-between text-white">
             <div className="flex items-center bg-black/30 px-2 py-1 rounded">
               <Users size={14} className="mr-1" />
