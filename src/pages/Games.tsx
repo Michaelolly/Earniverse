@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
@@ -14,6 +15,7 @@ import DiceRollGame from "@/components/games/DiceRollGame";
 import AviatorGame from "@/components/games/aviator/AviatorGame";
 import { format } from "date-fns";
 import { toast } from "@/hooks/use-toast";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 const Games = () => {
   const { user, loading } = useAuth();
@@ -24,6 +26,7 @@ const Games = () => {
   const [selectedGame, setSelectedGame] = useState<string | null>(null);
   const [isLoadingData, setIsLoadingData] = useState<boolean>(true);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [showAviatorGame, setShowAviatorGame] = useState(true);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -176,6 +179,87 @@ const Games = () => {
           </Card>
         </div>
 
+        {/* Featured Game - Always visible */}
+        {showAviatorGame && (
+          <div className="mb-8">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold flex items-center gap-2">
+                <Plane size={20} className="text-blue-500" />
+                Featured Game: Aviat
+              </h2>
+              <Button 
+                variant="outline"
+                size="sm"
+                onClick={() => setShowAviatorGame(false)}
+              >
+                Hide Game
+              </Button>
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <AviatorGame onGameComplete={refreshData} />
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Trophy size={18} className="text-yellow-500" />
+                    Top Players
+                  </CardTitle>
+                  <CardDescription>Players with highest winnings today</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Player</TableHead>
+                        <TableHead>Games</TableHead>
+                        <TableHead>Best Multiplier</TableHead>
+                        <TableHead className="text-right">Winnings</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {/* Mock data for top players */}
+                      <TableRow>
+                        <TableCell className="font-medium">Player1</TableCell>
+                        <TableCell>32</TableCell>
+                        <TableCell className="text-yellow-500">24.56x</TableCell>
+                        <TableCell className="text-right">$1,248.50</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell className="font-medium">Player2</TableCell>
+                        <TableCell>18</TableCell>
+                        <TableCell className="text-yellow-500">16.32x</TableCell>
+                        <TableCell className="text-right">$865.20</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell className="font-medium">Player3</TableCell>
+                        <TableCell>27</TableCell>
+                        <TableCell className="text-yellow-500">12.84x</TableCell>
+                        <TableCell className="text-right">$723.65</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell className="font-medium">You</TableCell>
+                        <TableCell>{gamesPlayedToday}</TableCell>
+                        <TableCell className="text-yellow-500">
+                          {gameHistory.length > 0 
+                            ? `${Math.max(...gameHistory.filter(g => new Date(g.played_at) >= today)
+                                .map(g => parseFloat(g.outcome.split(' - ')[1].replace('Crashed at ', '').replace('x', '')) || 0)
+                                ).toFixed(2)}x`
+                            : '0.00x'}
+                        </TableCell>
+                        <TableCell className="text-right">${winningsToday.toFixed(2)}</TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                </CardContent>
+                <CardFooter>
+                  <Button variant="outline" className="w-full" onClick={() => window.open('/leaderboard', '_blank')}>
+                    View Full Leaderboard
+                  </Button>
+                </CardFooter>
+              </Card>
+            </div>
+          </div>
+        )}
+
         <Tabs defaultValue="casino" className="mb-8">
           <TabsList className="mb-4">
             <TabsTrigger value="casino">Casino</TabsTrigger>
@@ -199,6 +283,30 @@ const Games = () => {
                   </h2>
                 </div>
                 {renderGameContent()}
+              </div>
+            ) : !showAviatorGame ? (
+              <div className="mb-6">
+                <Button 
+                  variant="outline" 
+                  className="mb-4"
+                  onClick={() => setShowAviatorGame(true)}
+                >
+                  <Plane size={16} className="mr-2" /> Show Aviator Game
+                </Button>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                  {games.map((game) => (
+                    <GameCard 
+                      key={game.id}
+                      title={game.name}
+                      category={game.description || "Casino Game"}
+                      icon={getGameIcon(game.name)}
+                      minBet={`$${game.min_bet}`}
+                      bgClass={getGameBackground(game.name)}
+                      isHot={game.name === "Coin Flip" || game.name === "Dice Roll" || game.name === "Aviat"}
+                      onClick={() => setSelectedGame(game.name)}
+                    />
+                  ))}
+                </div>
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
