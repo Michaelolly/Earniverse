@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 
@@ -134,7 +133,6 @@ export const playGame = async (
   }
 };
 
-// Game logic functions
 export const playCoinFlip = async (userId: string, betAmount: number, userChoice: 'heads' | 'tails'): Promise<{ success: boolean; message?: string; error?: string }> => {
   try {
     // Get the coin flip game
@@ -220,6 +218,54 @@ export const playDiceRoll = async (userId: string, betAmount: number, userChoice
     };
   } catch (error: any) {
     console.error('Error in playDiceRoll:', error);
+    return { success: false, error: 'An unexpected error occurred' };
+  }
+};
+
+export const playAviator = async (
+  userId: string, 
+  betAmount: number, 
+  cashoutMultiplier: number | null, 
+  crashPoint: number
+): Promise<{ success: boolean; message?: string; error?: string }> => {
+  try {
+    // Get the aviator game
+    const { data: gameData, error: gameError } = await supabase
+      .from('games')
+      .select('id')
+      .eq('name', 'Aviat')
+      .single();
+    
+    if (gameError || !gameData) {
+      return { success: false, error: 'Game not found' };
+    }
+    
+    // Determine outcome
+    const isWin = cashoutMultiplier !== null && cashoutMultiplier <= crashPoint;
+    
+    // Calculate win amount (bet * multiplier for a win, 0 for a loss)
+    const winAmount = isWin ? betAmount * cashoutMultiplier : 0;
+    
+    // Record game outcome
+    const gameOutcome = {
+      outcome: `${isWin ? 'Win' : 'Loss'} - Crashed at ${crashPoint.toFixed(2)}${cashoutMultiplier ? `, cashed out at ${cashoutMultiplier.toFixed(2)}` : ', no cashout'}`,
+      win_amount: winAmount
+    };
+    
+    const playResult = await playGame(userId, gameData.id, betAmount, gameOutcome);
+    
+    if (!playResult.success) {
+      return { success: false, error: playResult.error };
+    }
+    
+    return { 
+      success: true, 
+      message: isWin 
+        ? `You won $${winAmount.toFixed(2)} by cashing out at ${cashoutMultiplier.toFixed(2)}x` 
+        : `You lost $${betAmount.toFixed(2)}. Plane crashed at ${crashPoint.toFixed(2)}x`
+    };
+  } catch (error: any) {
+    console.error('Error in playAviator:', error);
     return { success: false, error: 'An unexpected error occurred' };
   }
 };

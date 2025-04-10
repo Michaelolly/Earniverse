@@ -6,11 +6,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dice5, Trophy, MonitorPlay, MessageSquare, Gamepad2, Clock, Users, TrendingUp, Flame } from "lucide-react";
+import { Dice5, Trophy, MonitorPlay, MessageSquare, Gamepad2, Clock, Users, TrendingUp, Flame, Plane } from "lucide-react";
 import { fetchGames, Game, fetchGameHistory, GameSession } from "@/services/gameService";
 import { fetchUserBalance, UserBalance } from "@/services/userService";
 import CoinFlipGame from "@/components/games/CoinFlipGame";
 import DiceRollGame from "@/components/games/DiceRollGame";
+import AviatorGame from "@/components/games/aviator/AviatorGame";
 import { format } from "date-fns";
 import { toast } from "@/hooks/use-toast";
 
@@ -80,6 +81,8 @@ const Games = () => {
         return <CoinFlipGame onGameComplete={refreshData} />;
       case "Dice Roll":
         return <DiceRollGame onGameComplete={refreshData} />;
+      case "Aviat":
+        return <AviatorGame onGameComplete={refreshData} />;
       default:
         return (
           <div className="text-center py-10">
@@ -207,7 +210,7 @@ const Games = () => {
                     icon={getGameIcon(game.name)}
                     minBet={`$${game.min_bet}`}
                     bgClass={getGameBackground(game.name)}
-                    isHot={game.name === "Coin Flip" || game.name === "Dice Roll"}
+                    isHot={game.name === "Coin Flip" || game.name === "Dice Roll" || game.name === "Aviat"}
                     onClick={() => setSelectedGame(game.name)}
                   />
                 ))}
@@ -339,6 +342,8 @@ const getGameIcon = (gameName: string) => {
       return <Dice5 size={24} />;
     case "Dice Roll":
       return <Dice5 size={24} />;
+    case "Aviat":
+      return <Plane size={24} />;
     case "Slot Machine":
       return <MonitorPlay size={24} />;
     case "Roulette":
@@ -356,6 +361,8 @@ const getGameBackground = (gameName: string) => {
       return "bg-gradient-to-br from-yellow-500 to-amber-700";
     case "Dice Roll":
       return "bg-gradient-to-br from-purple-600 to-purple-900";
+    case "Aviat":
+      return "bg-gradient-to-br from-blue-700 to-indigo-900";
     case "Slot Machine":
       return "bg-gradient-to-br from-earniverse-gold to-earniverse-royal-gold";
     case "Roulette":

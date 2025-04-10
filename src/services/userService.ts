@@ -65,22 +65,27 @@ const fetchUserBalance = async (userId: string): Promise<UserBalance | null> => 
       
       // Use edge function as fallback if there's an error with direct DB access
       console.info("Fallback: Fetching balance via edge function");
-      const { data: edgeFunctionData, error: edgeFunctionError } = await supabase.functions
-        .invoke('get_user_balance', {
-          body: { user_id: userId }
+      try {
+        const response = await fetch(`https://fghuralujkiddeuncyml.supabase.co/functions/v1/get_user_balance`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ user_id: userId })
         });
-      
-      if (edgeFunctionError) {
-        console.error("Error from edge function:", edgeFunctionError);
-        toast({
-          title: "Error",
-          description: "Failed to fetch your balance",
-          variant: "destructive",
-        });
-        return null;
-      }
-      
-      if (edgeFunctionData?.success) {
+        
+        const edgeFunctionData = await response.json();
+        
+        if (!edgeFunctionData.success) {
+          console.error("Error from edge function:", edgeFunctionData.error);
+          toast({
+            title: "Error",
+            description: "Failed to fetch your balance",
+            variant: "destructive",
+          });
+          return null;
+        }
+        
         console.info(`Got balance from edge function: ${edgeFunctionData.balance}`);
         // Create a balance object from the edge function response
         return {
@@ -91,9 +96,15 @@ const fetchUserBalance = async (userId: string): Promise<UserBalance | null> => 
           total_losses: 0,   // Edge function doesn't return these yet
           updated_at: new Date().toISOString(),
         };
+      } catch (edgeFunctionError) {
+        console.error("Error from edge function:", edgeFunctionError);
+        toast({
+          title: "Error",
+          description: "Failed to fetch your balance",
+          variant: "destructive",
+        });
+        return null;
       }
-      
-      return null;
     }
     
     return data;
