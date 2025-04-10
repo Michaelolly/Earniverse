@@ -16,7 +16,7 @@ import { useSearchParams } from "react-router-dom";
 import { demoPaymentConfig } from "@/integrations/flutterwave/config";
 
 interface DepositFundsDialogProps {
-  onDepositSuccess?: () => void;
+  onDepositSuccess?: (newBalance?: number) => void;
 }
 
 const DepositFundsDialog = ({ onDepositSuccess }: DepositFundsDialogProps) => {
@@ -66,7 +66,7 @@ const DepositFundsDialog = ({ onDepositSuccess }: DepositFundsDialogProps) => {
     setPaymentMethod("demo");
   };
 
-  const handleFlutterwaveSuccess = () => {
+  const handleFlutterwaveSuccess = (newBalance?: number) => {
     setIsSuccess(true);
     
     // After 2 seconds, reset the form and close the dialog
@@ -76,12 +76,12 @@ const DepositFundsDialog = ({ onDepositSuccess }: DepositFundsDialogProps) => {
       setTimeout(resetForm, 300);
       
       if (onDepositSuccess) {
-        onDepositSuccess();
+        onDepositSuccess(newBalance);
       }
     }, 2000);
   };
 
-  const handleDemoSuccess = () => {
+  const handleDemoSuccess = (newBalance?: number) => {
     setIsSuccess(true);
     
     // After 2 seconds, reset the form and close the dialog
@@ -92,7 +92,7 @@ const DepositFundsDialog = ({ onDepositSuccess }: DepositFundsDialogProps) => {
         resetForm();
         
         if (onDepositSuccess) {
-          onDepositSuccess();
+          onDepositSuccess(newBalance);
         }
       }, 300);
     }, 2000);

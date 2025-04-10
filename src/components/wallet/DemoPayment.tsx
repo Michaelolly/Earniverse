@@ -8,7 +8,7 @@ import { demoPaymentConfig } from "@/integrations/flutterwave/config";
 
 interface DemoPaymentProps {
   amount: string;
-  onSuccess?: () => void;
+  onSuccess?: (newBalance?: number) => void;
 }
 
 const DemoPayment = ({ amount, onSuccess }: DemoPaymentProps) => {
@@ -59,14 +59,16 @@ const DemoPayment = ({ amount, onSuccess }: DemoPaymentProps) => {
         throw new Error(result.error || "Failed to process payment");
       }
 
+      console.log("Demo payment successful. New balance:", result.new_balance);
+
       toast({
         title: "Demo Payment Successful",
         description: `$${parsedAmount.toFixed(2)} has been added to your wallet.`,
       });
       
-      // Make sure onSuccess is called to trigger wallet refresh
+      // Make sure onSuccess is called to trigger wallet refresh with the new balance
       if (onSuccess) {
-        onSuccess();
+        onSuccess(result.new_balance);
       }
     } catch (error: any) {
       console.error("Error processing demo payment:", error);

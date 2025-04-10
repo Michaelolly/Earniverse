@@ -23,16 +23,43 @@ const Wallet = () => {
   
   const userId = user?.id || "guest-user";
 
+  const updateBalanceFromResponse = (newBalance: number) => {
+    console.log("Directly updating balance to:", newBalance);
+    setBalance(newBalance);
+  };
+
   const fetchUserBalance = useCallback(async () => {
     try {
       console.log("Fetching balance for user:", userId);
+      
       const data = await userService.fetchUserBalance(userId);
       
-      console.log("Received balance data:", data);
       if (data) {
+        console.log("Successfully fetched balance from DB:", data.balance);
         setBalance(data.balance);
       } else {
-        setBalance(0);
+        console.log("Fallback: Fetching balance via edge function");
+        try {
+          const response = await fetch(`https://fghuralujkiddeuncyml.supabase.co/functions/v1/get_user_balance`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ user_id: userId })
+          });
+          
+          const result = await response.json();
+          if (result.success && result.balance !== undefined) {
+            console.log("Got balance from edge function:", result.balance);
+            setBalance(result.balance);
+          } else {
+            console.error("Edge function failed to get balance:", result);
+            setBalance(0);
+          }
+        } catch (edgeFunctionError) {
+          console.error("Edge function error:", edgeFunctionError);
+          setBalance(0);
+        }
       }
     } catch (error) {
       console.error("Error fetching balance:", error);
@@ -49,7 +76,6 @@ const Wallet = () => {
     }
   }, [userId]);
 
-  // Combined fetch function to ensure both data fetches happen together
   const fetchWalletData = useCallback(() => {
     setIsLoading(true);
     Promise.all([
@@ -97,12 +123,16 @@ const Wallet = () => {
     setRefreshTrigger(prev => prev + 1);
   };
 
-  const handleDepositSuccess = () => {
-    // Refresh the wallet data after successful deposit
-    console.log("Deposit success detected, refreshing wallet data");
+  const handleDepositSuccess = (newBalance?: number) => {
+    console.log("Deposit success detected, new balance:", newBalance);
+    
+    if (newBalance !== undefined) {
+      updateBalanceFromResponse(newBalance);
+    }
+    
     setTimeout(() => {
       setRefreshTrigger(prev => prev + 1);
-    }, 500); // Small delay to ensure the database has been updated
+    }, 500);
   };
 
   const handleWithdraw = () => {

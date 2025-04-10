@@ -10,7 +10,7 @@ import { flutterwaveConfig } from "@/integrations/flutterwave/config";
 
 interface FlutterwavePaymentProps {
   amount: string;
-  onSuccess?: () => void;
+  onSuccess?: (newBalance?: number) => void;
 }
 
 const FlutterwavePayment = ({ amount, onSuccess }: FlutterwavePaymentProps) => {
@@ -53,28 +53,28 @@ const FlutterwavePayment = ({ amount, onSuccess }: FlutterwavePaymentProps) => {
             // Process the deposit to update user balance
             const depositAmount = parseFloat(amount);
             
-            // Get current user balance or default to 0
-            let userBalance = await userService.fetchUserBalance(userId);
-            const currentBalance = userBalance?.balance || 0;
+            // Use edge function directly to avoid RLS issues
+            const edgeFunctionResponse = await fetch(`https://fghuralujkiddeuncyml.supabase.co/functions/v1/update_balance_after_game`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                p_user_id: userId,
+                p_amount: depositAmount,
+                p_game_session_id: null,
+                p_transaction_type: 'deposit',
+                p_description: `Flutterwave deposit - Ref: ${response.transaction_id}`
+              })
+            });
             
-            // Calculate new balance
-            const newBalance = currentBalance + depositAmount;
+            const result = await edgeFunctionResponse.json();
             
-            // Process the deposit
-            const result = await userService.processDeposit(
-              userId,
-              newBalance,
-              {
-                user_id: userId,
-                amount: depositAmount,
-                type: 'deposit',
-                description: `Flutterwave deposit - Ref: ${response.transaction_id}`
-              }
-            );
-
             if (!result.success) {
-              throw new Error(result.error || "Failed to process deposit");
+              throw new Error(result.error || "Failed to process payment");
             }
+
+            console.log("Flutterwave payment successful. New balance:", result.new_balance);
 
             toast({
               title: "Payment Successful",
@@ -83,7 +83,7 @@ const FlutterwavePayment = ({ amount, onSuccess }: FlutterwavePaymentProps) => {
             
             // Make sure onSuccess is called to trigger wallet refresh
             if (onSuccess) {
-              setTimeout(() => onSuccess(), 500);
+              setTimeout(() => onSuccess(result.new_balance), 500);
             }
           } catch (error: any) {
             console.error("Error processing payment:", error);
