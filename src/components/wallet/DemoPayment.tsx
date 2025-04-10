@@ -64,6 +64,7 @@ const DemoPayment = ({ amount, onSuccess }: DemoPaymentProps) => {
         description: `$${parsedAmount.toFixed(2)} has been added to your wallet.`,
       });
       
+      // Make sure onSuccess is called to trigger wallet refresh
       if (onSuccess) {
         onSuccess();
       }

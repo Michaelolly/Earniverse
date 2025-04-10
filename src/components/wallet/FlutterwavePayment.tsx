@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { useFlutterwave, closePaymentModal } from "flutterwave-react-v3";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
+import { Plus, Loader2 } from "lucide-react";
 import { userService } from "@/services/userService";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
@@ -81,8 +81,9 @@ const FlutterwavePayment = ({ amount, onSuccess }: FlutterwavePaymentProps) => {
               description: `$${depositAmount.toFixed(2)} has been added to your wallet.`,
             });
             
+            // Make sure onSuccess is called to trigger wallet refresh
             if (onSuccess) {
-              onSuccess();
+              setTimeout(() => onSuccess(), 500);
             }
           } catch (error: any) {
             console.error("Error processing payment:", error);
@@ -114,7 +115,10 @@ const FlutterwavePayment = ({ amount, onSuccess }: FlutterwavePaymentProps) => {
       className="w-full bg-earniverse-gold hover:bg-earniverse-royal-gold text-black gap-2"
     >
       {isProcessing ? (
-        "Processing..."
+        <>
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Processing...
+        </>
       ) : (
         <>
           <Plus size={16} />

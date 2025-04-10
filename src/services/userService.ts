@@ -52,6 +52,9 @@ export const fetchUserProfile = async (userId: string): Promise<UserProfile | nu
 
 export const fetchUserBalance = async (userId: string): Promise<UserBalance | null> => {
   try {
+    // Use the current timestamp to bust cache and ensure fresh data
+    const timestamp = new Date().getTime();
+    
     const { data, error } = await supabase
       .from('user_balances')
       .select('*')

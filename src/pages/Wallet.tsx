@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
@@ -25,10 +24,11 @@ const Wallet = () => {
   const userId = user?.id || "guest-user";
 
   const fetchUserBalance = useCallback(async () => {
-    setIsLoading(true);
     try {
+      console.log("Fetching balance for user:", userId);
       const data = await userService.fetchUserBalance(userId);
       
+      console.log("Received balance data:", data);
       if (data) {
         setBalance(data.balance);
       } else {
@@ -37,8 +37,6 @@ const Wallet = () => {
     } catch (error) {
       console.error("Error fetching balance:", error);
       setBalance(0);
-    } finally {
-      setIsLoading(false);
     }
   }, [userId]);
 
@@ -57,12 +55,18 @@ const Wallet = () => {
     Promise.all([
       fetchUserBalance(),
       fetchTransactions()
-    ]).finally(() => setIsLoading(false));
+    ]).finally(() => {
+      console.log("Wallet data fetch complete");
+      setIsLoading(false);
+    });
   }, [fetchUserBalance, fetchTransactions]);
 
   useEffect(() => {
-    fetchWalletData();
-  }, [refreshTrigger, fetchWalletData]);
+    if (user) {
+      console.log("Refresh trigger changed, fetching wallet data. Trigger:", refreshTrigger);
+      fetchWalletData();
+    }
+  }, [refreshTrigger, fetchWalletData, user]);
 
   useEffect(() => {
     const paymentStatus = searchParams.get("payment");
@@ -75,6 +79,7 @@ const Wallet = () => {
       newParams.delete("amount");
       setSearchParams(newParams);
       
+      console.log("Payment status detected, refreshing wallet data");
       setRefreshTrigger(prev => prev + 1);
       
       if (paymentStatus === "canceled") {
@@ -88,12 +93,16 @@ const Wallet = () => {
   }, [searchParams, setSearchParams, toast]);
 
   const handleRefresh = () => {
+    console.log("Manual refresh requested");
     setRefreshTrigger(prev => prev + 1);
   };
 
   const handleDepositSuccess = () => {
     // Refresh the wallet data after successful deposit
-    setRefreshTrigger(prev => prev + 1);
+    console.log("Deposit success detected, refreshing wallet data");
+    setTimeout(() => {
+      setRefreshTrigger(prev => prev + 1);
+    }, 500); // Small delay to ensure the database has been updated
   };
 
   const handleWithdraw = () => {
@@ -138,7 +147,12 @@ const Wallet = () => {
                       <ArrowUpRight size={14} />
                       Withdraw
                     </Button>
-                    <Button size="sm" variant="outline" className="gap-1" onClick={handleRefresh}>
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      className="gap-1" 
+                      onClick={handleRefresh}
+                    >
                       <RefreshCw size={14} />
                       Refresh
                     </Button>
