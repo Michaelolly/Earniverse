@@ -4,19 +4,18 @@ import { toast } from "@/hooks/use-toast";
 
 export interface UserProfile {
   id: string;
-  username: string | null;
-  avatar_url: string | null;
-  role: string;
+  username?: string;
+  avatar_url?: string;
   created_at: string;
-  updated_at: string;
+  role: string;
 }
 
 export interface UserBalance {
   id: string;
   user_id: string;
   balance: number;
-  total_winnings: number | null;
-  total_losses: number | null;
+  total_winnings: number;
+  total_losses: number;
   updated_at: string;
 }
 
@@ -25,11 +24,12 @@ export interface Transaction {
   user_id: string;
   amount: number;
   type: string;
-  reference_id: string | null;
+  description?: string;
+  reference_id?: string;
   created_at: string;
-  description: string | null;
 }
 
+// Fetch user profile data
 export const fetchUserProfile = async (userId: string): Promise<UserProfile | null> => {
   try {
     const { data, error } = await supabase
@@ -39,22 +39,21 @@ export const fetchUserProfile = async (userId: string): Promise<UserProfile | nu
       .single();
     
     if (error) {
-      console.error('Error fetching user profile:', error);
+      console.error("Error fetching profile:", error);
       return null;
     }
     
     return data;
-  } catch (error: any) {
-    console.error('Unexpected error fetching user profile:', error);
+  } catch (error) {
+    console.error("Unexpected error fetching profile:", error);
     return null;
   }
 };
 
+// Fetch user balance with fallback to edge function
 export const fetchUserBalance = async (userId: string): Promise<UserBalance | null> => {
   try {
-    // Use the current timestamp to bust cache and ensure fresh data
-    const timestamp = new Date().getTime();
-    
+    // Try fetching balance from database directly first
     const { data, error } = await supabase
       .from('user_balances')
       .select('*')
@@ -62,17 +61,49 @@ export const fetchUserBalance = async (userId: string): Promise<UserBalance | nu
       .single();
     
     if (error) {
-      console.error('Error fetching user balance:', error);
+      console.error("Error fetching user balance:", error);
+      
+      // Use edge function as fallback if there's an error with direct DB access
+      console.info("Fallback: Fetching balance via edge function");
+      const { data: edgeFunctionData, error: edgeFunctionError } = await supabase.functions
+        .invoke('get_user_balance', {
+          body: { user_id: userId }
+        });
+      
+      if (edgeFunctionError) {
+        console.error("Error from edge function:", edgeFunctionError);
+        toast({
+          title: "Error",
+          description: "Failed to fetch your balance",
+          variant: "destructive",
+        });
+        return null;
+      }
+      
+      if (edgeFunctionData?.success) {
+        console.info(`Got balance from edge function: ${edgeFunctionData.balance}`);
+        // Create a balance object from the edge function response
+        return {
+          id: 'edge-function-balance',
+          user_id: userId,
+          balance: edgeFunctionData.balance,
+          total_winnings: 0, // Edge function doesn't return these yet
+          total_losses: 0,   // Edge function doesn't return these yet
+          updated_at: new Date().toISOString(),
+        };
+      }
+      
       return null;
     }
     
     return data;
-  } catch (error: any) {
-    console.error('Unexpected error fetching user balance:', error);
+  } catch (error) {
+    console.error("Unexpected error fetching user balance:", error);
     return null;
   }
 };
 
+// Fetch user transactions
 export const fetchUserTransactions = async (userId: string): Promise<Transaction[]> => {
   try {
     const { data, error } = await supabase
@@ -82,209 +113,35 @@ export const fetchUserTransactions = async (userId: string): Promise<Transaction
       .order('created_at', { ascending: false });
     
     if (error) {
-      console.error('Error fetching user transactions:', error);
+      console.error("Error fetching user transactions:", error);
       return [];
     }
     
     return data || [];
-  } catch (error: any) {
-    console.error('Unexpected error fetching user transactions:', error);
+  } catch (error) {
+    console.error("Unexpected error fetching transactions:", error);
     return [];
   }
 };
 
+// Update user profile
 export const updateUserProfile = async (
-  userId: string,
-  updates: Partial<Omit<UserProfile, 'id' | 'role' | 'created_at' | 'updated_at'>>
-): Promise<{ success: boolean; profile?: UserProfile; error?: string }> => {
-  try {
-    const { data, error } = await supabase
-      .from('profiles')
-      .update({
-        ...updates,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', userId)
-      .select()
-      .single();
-    
-    if (error) {
-      console.error('Error updating profile:', error);
-      return { success: false, error: error.message };
-    }
-    
-    return { success: true, profile: data };
-  } catch (error: any) {
-    console.error('Unexpected error updating profile:', error);
-    return { success: false, error: 'An unexpected error occurred' };
-  }
-};
-
-export const processDeposit = async (
   userId: string, 
-  newBalance: number,
-  transactionData: {
-    user_id: string;
-    amount: number;
-    type: string;
-    description: string;
-  }
+  updates: Partial<UserProfile>
 ): Promise<{ success: boolean; error?: string }> => {
   try {
-    console.log("Processing deposit for user:", userId, "with new balance:", newBalance);
-    console.log("Transaction data:", transactionData);
-    
-    // Create a Supabase transaction to ensure both operations succeed or fail together
-    // First check if user balance record exists
-    const { data: existingBalance } = await supabase
-      .from('user_balances')
-      .select('id')
-      .eq('user_id', userId);
-    
-    if (!existingBalance || existingBalance.length === 0) {
-      // No balance record exists, create one
-      const { error: insertError } = await supabase
-        .from('user_balances')
-        .insert({
-          user_id: userId,
-          balance: transactionData.amount, // Start with the deposit amount
-          updated_at: new Date().toISOString()
-        });
-      
-      if (insertError) {
-        console.error('Error creating balance record:', insertError);
-        return { success: false, error: insertError.message };
-      }
-    } else {
-      // Balance record exists, update it
-      const { error: updateError } = await supabase
-        .from('user_balances')
-        .update({ 
-          balance: newBalance,
-          updated_at: new Date().toISOString()
-        })
-        .eq('user_id', userId);
-      
-      if (updateError) {
-        console.error('Error updating balance:', updateError);
-        return { success: false, error: updateError.message };
-      }
-    }
-    
-    // Create transaction record
-    const { error: transactionError } = await supabase
-      .from('transactions')
-      .insert({
-        user_id: transactionData.user_id,
-        amount: transactionData.amount,
-        type: transactionData.type,
-        description: transactionData.description,
-        created_at: new Date().toISOString()
-      });
-    
-    if (transactionError) {
-      console.error('Error creating transaction:', transactionError);
-      return { success: false, error: transactionError.message };
-    }
-    
-    console.log("Deposit processed successfully");
-    return { success: true };
-  } catch (error: any) {
-    console.error('Unexpected error processing deposit:', error);
-    return { success: false, error: 'An unexpected error occurred' };
-  }
-};
-
-export const isUserAdmin = async (userId: string): Promise<boolean> => {
-  try {
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('profiles')
-      .select('role')
-      .eq('id', userId)
-      .single();
-    
-    if (error || !data) {
-      console.error('Error checking admin status:', error);
-      return false;
-    }
-    
-    return data.role === 'admin';
-  } catch (error: any) {
-    console.error('Unexpected error checking admin status:', error);
-    return false;
-  }
-};
-
-export const fetchAllUsers = async (): Promise<UserProfile[]> => {
-  try {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*');
+      .update(updates)
+      .eq('id', userId);
     
     if (error) {
-      console.error('Error fetching all users:', error);
-      toast({
-        title: "Failed to load users",
-        description: error.message,
-        variant: "destructive",
-      });
-      return [];
-    }
-    
-    return data || [];
-  } catch (error: any) {
-    console.error('Unexpected error fetching all users:', error);
-    return [];
-  }
-};
-
-export const fetchAllBalances = async (): Promise<UserBalance[]> => {
-  try {
-    const { data, error } = await supabase
-      .from('user_balances')
-      .select('*');
-    
-    if (error) {
-      console.error('Error fetching all balances:', error);
-      toast({
-        title: "Failed to load balances",
-        description: error.message,
-        variant: "destructive",
-      });
-      return [];
-    }
-    
-    return data || [];
-  } catch (error: any) {
-    console.error('Unexpected error fetching all balances:', error);
-    return [];
-  }
-};
-
-export const makeUserAdmin = async (userEmail: string): Promise<{ success: boolean; error?: string }> => {
-  try {
-    const { error } = await supabase.rpc('make_user_admin', { user_email: userEmail });
-    
-    if (error) {
-      console.error('Error making user admin:', error);
       return { success: false, error: error.message };
     }
     
     return { success: true };
-  } catch (error: any) {
-    console.error('Unexpected error making user admin:', error);
-    return { success: false, error: 'An unexpected error occurred' };
+  } catch (error) {
+    console.error("Unexpected error updating profile:", error);
+    return { success: false, error: "Failed to update profile" };
   }
-};
-
-export const userService = {
-  fetchUserProfile,
-  fetchUserBalance,
-  fetchUserTransactions,
-  updateUserProfile,
-  isUserAdmin,
-  fetchAllUsers,
-  fetchAllBalances,
-  makeUserAdmin,
-  processDeposit
 };

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,7 +9,11 @@ import { playDiceRoll } from "@/services/gameService";
 import { useAuth } from "@/context/AuthContext";
 import { fetchUserBalance } from "@/services/userService";
 
-const DiceRollGame = () => {
+interface DiceRollGameProps {
+  onGameComplete?: () => void;
+}
+
+const DiceRollGame = ({ onGameComplete }: DiceRollGameProps) => {
   const { user } = useAuth();
   const [betAmount, setBetAmount] = useState<number>(1);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
@@ -53,7 +56,6 @@ const DiceRollGame = () => {
     setUserChoice(choice);
     setIsRolling(true);
     
-    // Simulate dice roll animation
     setTimeout(async () => {
       try {
         const result = await playDiceRoll(user.id, betAmount, choice);
@@ -68,10 +70,13 @@ const DiceRollGame = () => {
             variant: result.message?.includes("won") ? "default" : "destructive",
           });
           
-          // Update balance
           const updatedBalance = await fetchUserBalance(user.id);
           if (updatedBalance) {
             setBalance(updatedBalance.balance);
+          }
+          
+          if (onGameComplete) {
+            onGameComplete();
           }
         } else {
           toast({

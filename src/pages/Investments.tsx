@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
@@ -66,7 +65,7 @@ const Investments = () => {
         setIsLoadingData(false);
       }
     }
-  }, [user, toast]);
+  }, [user]);
 
   useEffect(() => {
     loadData();
@@ -102,7 +101,6 @@ const Investments = () => {
     setIsInvesting(true);
     
     try {
-      // Generate a random performance between min and max potential return
       const performanceFactor = (Math.random() * (selectedOpportunity.potential_return_max - selectedOpportunity.potential_return_min) + selectedOpportunity.potential_return_min) / 100;
       const currentValue = investmentAmount * (1 + performanceFactor);
       
@@ -122,7 +120,6 @@ const Investments = () => {
         
         setDialogOpen(false);
         
-        // Refresh data
         setRefreshTrigger(prev => prev + 1);
       } else {
         throw new Error(result.error || "An error occurred while creating your investment");
@@ -151,7 +148,6 @@ const Investments = () => {
           description: "Your investment has been sold successfully",
         });
         
-        // Refresh data
         setRefreshTrigger(prev => prev + 1);
       } else {
         throw new Error(result.error || "An error occurred while selling your investment");
@@ -174,13 +170,11 @@ const Investments = () => {
     );
   }
 
-  // Calculate total investment value and allocation percentages
   const totalValue = investments.reduce((sum, inv) => sum + inv.current_value, 0);
   const totalInvested = investments.reduce((sum, inv) => sum + inv.amount_invested, 0);
   const profit = totalValue - totalInvested;
   const profitPercentage = totalInvested > 0 ? (profit / totalInvested) * 100 : 0;
   
-  // Calculate allocation for pie chart
   const categories: Record<string, number> = {};
   investments.forEach(inv => {
     if (categories[inv.category]) {
@@ -195,7 +189,6 @@ const Investments = () => {
     percentage: (value / totalValue) * 100
   }));
   
-  // Sort investments by current value
   const sortedInvestments = [...investments].sort((a, b) => b.current_value - a.current_value);
 
   const handleInvestmentAdded = () => {
@@ -210,7 +203,17 @@ const Investments = () => {
             <h1 className="text-2xl font-bold">Investment Hub</h1>
             <p className="text-muted-foreground">Grow your wealth with smart investments</p>
           </div>
-          <AddInvestmentModal onInvestmentAdded={handleInvestmentAdded} />
+          <div className="flex gap-2 items-center">
+            <Card className="shadow-sm">
+              <CardContent className="py-2 px-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium">Balance:</span>
+                  <span className="font-bold">${balance.toFixed(2)}</span>
+                </div>
+              </CardContent>
+            </Card>
+            <AddInvestmentModal onInvestmentAdded={() => setRefreshTrigger(prev => prev + 1)} />
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
@@ -268,7 +271,6 @@ const Investments = () => {
           </Card>
         </div>
 
-        {/* Real-time market data section */}
         <div className="mb-8">
           <RealTimeInvestmentData />
         </div>
@@ -447,7 +449,6 @@ const Investments = () => {
   );
 };
 
-// Helper function to get category colors
 const getCategoryColor = (category: string) => {
   switch (category.toLowerCase()) {
     case 'stock':

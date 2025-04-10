@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
@@ -13,6 +12,7 @@ import { fetchUserBalance, UserBalance } from "@/services/userService";
 import CoinFlipGame from "@/components/games/CoinFlipGame";
 import DiceRollGame from "@/components/games/DiceRollGame";
 import { format } from "date-fns";
+import { toast } from "@/hooks/use-toast";
 
 const Games = () => {
   const { user, loading } = useAuth();
@@ -22,6 +22,7 @@ const Games = () => {
   const [userBalance, setUserBalance] = useState<UserBalance | null>(null);
   const [selectedGame, setSelectedGame] = useState<string | null>(null);
   const [isLoadingData, setIsLoadingData] = useState<boolean>(true);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -33,21 +34,35 @@ const Games = () => {
     if (user) {
       const loadData = async () => {
         setIsLoadingData(true);
-        const [gamesData, historyData, balanceData] = await Promise.all([
-          fetchGames(),
-          fetchGameHistory(user.id),
-          fetchUserBalance(user.id)
-        ]);
-        
-        setGames(gamesData);
-        setGameHistory(historyData);
-        setUserBalance(balanceData);
-        setIsLoadingData(false);
+        try {
+          const [gamesData, historyData, balanceData] = await Promise.all([
+            fetchGames(),
+            fetchGameHistory(user.id),
+            fetchUserBalance(user.id)
+          ]);
+          
+          setGames(gamesData);
+          setGameHistory(historyData);
+          setUserBalance(balanceData);
+        } catch (error) {
+          console.error("Error loading game data:", error);
+          toast({
+            title: "Error",
+            description: "Failed to load game data",
+            variant: "destructive",
+          });
+        } finally {
+          setIsLoadingData(false);
+        }
       };
       
       loadData();
     }
-  }, [user]);
+  }, [user, refreshTrigger]);
+
+  const refreshData = () => {
+    setRefreshTrigger(prev => prev + 1);
+  };
 
   if (loading || isLoadingData) {
     return (
@@ -62,9 +77,9 @@ const Games = () => {
 
     switch (selectedGame) {
       case "Coin Flip":
-        return <CoinFlipGame />;
+        return <CoinFlipGame onGameComplete={refreshData} />;
       case "Dice Roll":
-        return <DiceRollGame />;
+        return <DiceRollGame onGameComplete={refreshData} />;
       default:
         return (
           <div className="text-center py-10">
@@ -74,25 +89,22 @@ const Games = () => {
     }
   };
 
-  // Calculate wins, losses, and win rate
   const totalGames = gameHistory.length;
   const wins = gameHistory.filter(g => g.win_amount && g.win_amount > 0).length;
   const winRate = totalGames > 0 ? Math.round((wins / totalGames) * 100) : 0;
   const totalWinnings = gameHistory.reduce((sum, game) => sum + (game.win_amount || 0), 0);
 
-  // Games played today
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const gamesPlayedToday = gameHistory.filter(
     game => new Date(game.played_at) >= today
   ).length;
 
-  // Winnings today
   const winningsToday = gameHistory
     .filter(game => new Date(game.played_at) >= today && game.win_amount && game.win_amount > 0)
     .reduce((sum, game) => sum + (game.win_amount || 0), 0);
   
-  const winRateChange = "+3"; // This would normally be calculated based on historical data
+  const winRateChange = "+3";
 
   return (
     <DashboardLayout>
@@ -321,7 +333,6 @@ const Games = () => {
   );
 };
 
-// Helper functions for game icons and backgrounds
 const getGameIcon = (gameName: string) => {
   switch (gameName) {
     case "Coin Flip":

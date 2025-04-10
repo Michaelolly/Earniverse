@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,7 +9,11 @@ import { playCoinFlip } from "@/services/gameService";
 import { useAuth } from "@/context/AuthContext";
 import { fetchUserBalance } from "@/services/userService";
 
-const CoinFlipGame = () => {
+interface CoinFlipGameProps {
+  onGameComplete?: () => void;
+}
+
+const CoinFlipGame = ({ onGameComplete }: CoinFlipGameProps) => {
   const { user } = useAuth();
   const [betAmount, setBetAmount] = useState<number>(1);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
@@ -53,7 +56,6 @@ const CoinFlipGame = () => {
     setUserChoice(choice);
     setIsFlipping(true);
     
-    // Simulate coin flip animation
     setTimeout(async () => {
       try {
         const result = await playCoinFlip(user.id, betAmount, choice);
@@ -69,10 +71,13 @@ const CoinFlipGame = () => {
             variant: wonGame ? "default" : "destructive",
           });
           
-          // Update balance
           const updatedBalance = await fetchUserBalance(user.id);
           if (updatedBalance) {
             setBalance(updatedBalance.balance);
+          }
+          
+          if (onGameComplete) {
+            onGameComplete();
           }
         } else {
           toast({
