@@ -30,7 +30,7 @@ export interface Transaction {
 }
 
 // Fetch user profile data
-export const fetchUserProfile = async (userId: string): Promise<UserProfile | null> => {
+const fetchUserProfile = async (userId: string): Promise<UserProfile | null> => {
   try {
     const { data, error } = await supabase
       .from('profiles')
@@ -51,7 +51,7 @@ export const fetchUserProfile = async (userId: string): Promise<UserProfile | nu
 };
 
 // Fetch user balance with fallback to edge function
-export const fetchUserBalance = async (userId: string): Promise<UserBalance | null> => {
+const fetchUserBalance = async (userId: string): Promise<UserBalance | null> => {
   try {
     // Try fetching balance from database directly first
     const { data, error } = await supabase
@@ -104,7 +104,7 @@ export const fetchUserBalance = async (userId: string): Promise<UserBalance | nu
 };
 
 // Fetch user transactions
-export const fetchUserTransactions = async (userId: string): Promise<Transaction[]> => {
+const fetchUserTransactions = async (userId: string): Promise<Transaction[]> => {
   try {
     const { data, error } = await supabase
       .from('transactions')
@@ -125,7 +125,7 @@ export const fetchUserTransactions = async (userId: string): Promise<Transaction
 };
 
 // Update user profile
-export const updateUserProfile = async (
+const updateUserProfile = async (
   userId: string, 
   updates: Partial<UserProfile>
 ): Promise<{ success: boolean; error?: string }> => {
@@ -144,4 +144,20 @@ export const updateUserProfile = async (
     console.error("Unexpected error updating profile:", error);
     return { success: false, error: "Failed to update profile" };
   }
+};
+
+// Export all functions as a service object
+export const userService = {
+  fetchUserProfile,
+  fetchUserBalance,
+  fetchUserTransactions,
+  updateUserProfile
+};
+
+// Also export individual functions for backward compatibility
+export {
+  fetchUserProfile,
+  fetchUserBalance,
+  fetchUserTransactions,
+  updateUserProfile
 };
