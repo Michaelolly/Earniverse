@@ -1,5 +1,7 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { updateUserBalance } from "./userService";
 
 export interface Game {
   id: string;
@@ -71,7 +73,7 @@ export const playGame = async (
   gameId: string,
   betAmount: number,
   gameOutcome: { outcome: string; win_amount: number | null }
-): Promise<{ success: boolean; session?: GameSession; error?: string }> => {
+): Promise<{ success: boolean; session?: GameSession; error?: string; newBalance?: number }> => {
   try {
     // First, check user's balance
     const { data: balanceData, error: balanceError } = await supabase
@@ -107,26 +109,29 @@ export const playGame = async (
       return { success: false, error: 'Failed to record game session' };
     }
     
-    // Update user's balance based on the outcome
+    // Calculate balance change based on the outcome
     const balanceChange = (gameOutcome.win_amount || 0) - betAmount;
     const transactionType = balanceChange >= 0 ? 'game_win' : 'game_loss';
+    const description = `${transactionType === 'game_win' ? 'Won' : 'Lost'} in ${gameId}`;
     
-    // Call the Supabase Edge Function to update balance
-    const { error: updateError } = await supabase.functions.invoke("update_balance_after_game", {
-      body: {
-        p_user_id: userId,
-        p_amount: balanceChange,
-        p_game_session_id: sessionData.id,
-        p_transaction_type: transactionType,
-        p_description: `${transactionType === 'game_win' ? 'Won' : 'Lost'} in ${gameId}`
-      }
-    });
+    // Update user's balance
+    const balanceUpdate = await updateUserBalance(
+      userId,
+      balanceChange,
+      transactionType,
+      description,
+      sessionData.id
+    );
     
-    if (updateError) {
-      return { success: false, error: 'Failed to update balance' };
+    if (!balanceUpdate.success) {
+      return { success: false, error: balanceUpdate.error };
     }
     
-    return { success: true, session: sessionData };
+    return { 
+      success: true, 
+      session: sessionData,
+      newBalance: balanceUpdate.newBalance
+    };
   } catch (error: any) {
     console.error('Error in playGame:', error);
     return { success: false, error: 'An unexpected error occurred' };
@@ -227,7 +232,7 @@ export const playAviator = async (
   betAmount: number, 
   cashoutMultiplier: number | null, 
   crashPoint: number
-): Promise<{ success: boolean; message?: string; error?: string }> => {
+): Promise<{ success: boolean; message?: string; error?: string; newBalance?: number }> => {
   try {
     // Get the aviator game
     const { data: gameData, error: gameError } = await supabase
@@ -262,7 +267,8 @@ export const playAviator = async (
       success: true, 
       message: isWin 
         ? `You won $${winAmount.toFixed(2)} by cashing out at ${cashoutMultiplier.toFixed(2)}x` 
-        : `You lost $${betAmount.toFixed(2)}. Plane crashed at ${crashPoint.toFixed(2)}x`
+        : `You lost $${betAmount.toFixed(2)}. Plane crashed at ${crashPoint.toFixed(2)}x`,
+      newBalance: playResult.newBalance
     };
   } catch (error: any) {
     console.error('Error in playAviator:', error);

@@ -1,6 +1,7 @@
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@12.6.0?target=deno";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -22,6 +23,8 @@ serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    console.log(`Processing Stripe payment for user ${userId}, amount: $${amount}`);
 
     // Initialize Stripe with the secret key from environment
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
@@ -55,6 +58,8 @@ serve(async (req) => {
         amount: amount
       },
     });
+
+    console.log(`Stripe session created: ${session.id}`);
 
     return new Response(
       JSON.stringify({ sessionId: session.id, url: session.url }),

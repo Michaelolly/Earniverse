@@ -1,210 +1,314 @@
 
 import { useState, useEffect } from "react";
-import DashboardLayout from "@/components/layout/DashboardLayout";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, BadgeCheck, ExternalLink } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
+import DashboardLayout from "@/components/layout/DashboardLayout";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { AlertCircle, PlayCircle, DollarSign, Award, Timer, RefreshCw } from "lucide-react";
+import { userService, updateUserBalance } from "@/services/userService";
+import { useToast } from "@/hooks/use-toast";
+import { Progress } from "@/components/ui/progress";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+
+const WATCH_TIME_REWARD = 0.25; // Amount earned per ad viewing session
+const WATCH_TIME_REQUIRED = 30; // Seconds required to earn the reward
+const MAX_DAILY_SESSIONS = 10; // Maximum number of paid ad views per day
 
 const WatchAndEarn = () => {
-  const [isLoading, setIsLoading] = useState(false);
-  const [watchCount, setWatchCount] = useState(0);
-  const [dailyLimit, setDailyLimit] = useState(5);
-  const [isAdWatched, setIsAdWatched] = useState(false);
+  const { user, loading } = useAuth();
   const { toast } = useToast();
-  const { user } = useAuth();
+  const [balance, setBalance] = useState<number | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isWatching, setIsWatching] = useState(false);
+  const [watchTime, setWatchTime] = useState(0);
+  const [sessionCount, setSessionCount] = useState(0);
+  const [adLink, setAdLink] = useState("https://www.profitableratecpm.com/a6ugtn3snv?key=58e9c4fff9308ccfc8012ab15de3da92");
   
   useEffect(() => {
-    // Track daily ad views
-    const fetchWatchHistory = async () => {
-      if (!user) return;
-      
-      try {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        
-        const { data, error } = await supabase
-          .from('transactions')
-          .select('created_at')
-          .eq('user_id', user.id)
-          .eq('type', 'ad_reward')
-          .gte('created_at', today.toISOString())
-          .order('created_at', { ascending: false });
+    const fetchData = async () => {
+      if (user) {
+        setIsLoading(true);
+        try {
+          // Get user balance
+          const data = await userService.fetchUserBalance(user.id);
+          if (data) {
+            setBalance(data.balance);
+          }
           
-        if (!error && data) {
-          setWatchCount(data.length);
+          // Get session count from localStorage
+          const today = new Date().toDateString();
+          const storedData = localStorage.getItem(`adSessions_${user.id}`);
+          let sessionsData = { date: today, count: 0 };
+          
+          if (storedData) {
+            const parsedData = JSON.parse(storedData);
+            if (parsedData.date === today) {
+              sessionsData = parsedData;
+            }
+          }
+          
+          setSessionCount(sessionsData.count);
+        } catch (error) {
+          console.error("Error fetching user data:", error);
+        } finally {
+          setIsLoading(false);
         }
-      } catch (error) {
-        console.error("Error fetching watch history:", error);
       }
     };
     
-    fetchWatchHistory();
-  }, [user, isAdWatched]);
+    fetchData();
+  }, [user]);
   
-  const handleAdInteraction = async () => {
+  useEffect(() => {
+    let interval: NodeJS.Timeout | null = null;
+    
+    if (isWatching && watchTime < WATCH_TIME_REQUIRED) {
+      interval = setInterval(() => {
+        setWatchTime(prev => prev + 1);
+      }, 1000);
+    }
+    
+    if (watchTime >= WATCH_TIME_REQUIRED) {
+      handleAdCompleted();
+    }
+    
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isWatching, watchTime]);
+  
+  const startWatching = () => {
     if (!user) {
       toast({
-        title: "Authentication Required",
-        description: "Please sign in to earn rewards from ads",
+        title: "Login Required",
+        description: "Please login to earn rewards from watching ads",
         variant: "destructive",
       });
       return;
     }
     
-    if (watchCount >= dailyLimit) {
+    if (sessionCount >= MAX_DAILY_SESSIONS) {
       toast({
         title: "Daily Limit Reached",
-        description: `You've reached your limit of ${dailyLimit} ad rewards for today`,
+        description: `You've reached the maximum limit of ${MAX_DAILY_SESSIONS} ad views per day`,
         variant: "destructive",
       });
       return;
     }
     
-    setIsLoading(true);
+    setIsWatching(true);
+    setWatchTime(0);
+    
+    toast({
+      title: "Ad Started",
+      description: `Watch for ${WATCH_TIME_REQUIRED} seconds to earn ${WATCH_TIME_REWARD.toFixed(2)} tokens`,
+    });
+    
+    // Rotate through different ad links if needed
+    // This is where you could set different ad URLs if you have multiple
+  };
+  
+  const handleAdCompleted = async () => {
+    if (!user) return;
+    
+    setIsWatching(false);
+    
+    // Update session count in localStorage
+    const today = new Date().toDateString();
+    const newCount = sessionCount + 1;
+    setSessionCount(newCount);
+    localStorage.setItem(`adSessions_${user.id}`, JSON.stringify({ date: today, count: newCount }));
     
     try {
-      // Simulate ad watching time (5 seconds)
-      setTimeout(async () => {
-        // Process the reward using the edge function
-        const rewardAmount = 5; // $5 reward per ad watch
-        
-        const { data, error } = await supabase.functions.invoke("update_balance_after_game", {
-          body: {
-            p_user_id: user.id,
-            p_amount: rewardAmount,
-            p_game_session_id: null,
-            p_transaction_type: 'ad_reward',
-            p_description: 'Reward for watching ads'
-          }
-        });
-        
-        if (error) {
-          throw new Error(error.message || "Failed to process reward");
-        }
-        
-        setIsAdWatched(true);
-        setWatchCount(prev => prev + 1);
-        
+      // Add reward to user's balance
+      const result = await updateUserBalance(
+        user.id,
+        WATCH_TIME_REWARD,
+        "ad_reward",
+        `Reward for watching an ad`
+      );
+      
+      if (result.success) {
         toast({
           title: "Reward Earned!",
-          description: `$${rewardAmount} has been added to your wallet`,
+          description: `You earned $${WATCH_TIME_REWARD.toFixed(2)} for watching the ad`,
         });
-      }, 5000);
-    } catch (error: any) {
+        
+        if (result.newBalance !== undefined) {
+          setBalance(result.newBalance);
+        } else {
+          // Refresh balance
+          const balanceData = await userService.fetchUserBalance(user.id);
+          if (balanceData) {
+            setBalance(balanceData.balance);
+          }
+        }
+      } else {
+        toast({
+          title: "Error",
+          description: result.error || "Failed to process reward",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
       console.error("Error processing ad reward:", error);
       toast({
-        title: "Error Processing Reward",
-        description: error.message || "There was an error processing your reward",
+        title: "Error",
+        description: "Failed to process your reward",
         variant: "destructive",
       });
-    } finally {
-      setTimeout(() => {
-        setIsLoading(false);
-        setIsAdWatched(false);
-      }, 6000);
     }
   };
   
+  const resetAdView = () => {
+    setIsWatching(false);
+    setWatchTime(0);
+  };
+  
+  if (loading) {
+    return (
+      <DashboardLayout>
+        <div className="p-6 flex justify-center items-center min-h-[60vh]">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-earniverse-gold"></div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+  
   return (
     <DashboardLayout>
-      <div className="container mx-auto p-4 md:p-6">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold tracking-tight">Watch & Earn</h1>
-          <p className="text-muted-foreground mt-2">
-            Watch ads to earn rewards. Limited to {dailyLimit} rewards per day.
-          </p>
+      <div className="p-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+          <div>
+            <h1 className="text-2xl font-bold">Watch & Earn</h1>
+            <p className="text-muted-foreground">Earn rewards by watching ads and engaging with content</p>
+          </div>
+          <Card className="w-full md:w-auto">
+            <CardContent className="p-4 flex items-center gap-3">
+              <DollarSign className="text-earniverse-gold" size={24} />
+              <div>
+                <p className="text-sm text-muted-foreground">Current Balance</p>
+                <p className="text-xl font-bold">${balance?.toFixed(2) || "0.00"}</p>
+              </div>
+            </CardContent>
+          </Card>
         </div>
         
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {/* Daily Progress Card */}
-          <Card>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <Card className="md:col-span-2">
             <CardHeader>
-              <CardTitle>Daily Progress</CardTitle>
+              <CardTitle>Watch Ads & Earn Rewards</CardTitle>
               <CardDescription>
-                Track your daily ad watching progress
+                Watch ads for {WATCH_TIME_REQUIRED} seconds to earn ${WATCH_TIME_REWARD.toFixed(2)} per view.
+                You can earn up to ${(MAX_DAILY_SESSIONS * WATCH_TIME_REWARD).toFixed(2)} per day!
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="flex items-center justify-center p-4">
-                <div className="text-center">
-                  <div className="text-5xl font-bold mb-2">
-                    {watchCount}/{dailyLimit}
+              {isWatching ? (
+                <div className="space-y-6">
+                  <div className="aspect-video bg-black rounded-md overflow-hidden mb-4">
+                    <iframe
+                      src={adLink}
+                      className="w-full h-full border-0"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                    ></iframe>
                   </div>
-                  <div className="text-sm text-muted-foreground">
-                    Ads watched today
+                  
+                  <div className="space-y-2">
+                    <div className="flex justify-between mb-1">
+                      <span className="text-sm">Progress: {watchTime} / {WATCH_TIME_REQUIRED} seconds</span>
+                      <span className="text-sm">{Math.min(Math.round((watchTime / WATCH_TIME_REQUIRED) * 100), 100)}%</span>
+                    </div>
+                    <Progress value={Math.min((watchTime / WATCH_TIME_REQUIRED) * 100, 100)} />
+                  </div>
+                  
+                  <Button onClick={resetAdView} variant="outline" className="w-full">
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    Cancel & Reset
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  <div className="aspect-video bg-gray-100 dark:bg-gray-800 rounded-md flex flex-col items-center justify-center p-6 text-center">
+                    <PlayCircle className="h-16 w-16 mb-4 text-earniverse-gold" />
+                    <h3 className="text-xl font-medium mb-2">Earn By Watching Ads</h3>
+                    <p className="text-muted-foreground mb-6">
+                      Watch ads for just {WATCH_TIME_REQUIRED} seconds and earn ${WATCH_TIME_REWARD.toFixed(2)} per view!
+                    </p>
+                    <Button 
+                      onClick={startWatching} 
+                      disabled={sessionCount >= MAX_DAILY_SESSIONS}
+                      className="bg-earniverse-gold hover:bg-earniverse-royal-gold text-black gap-2"
+                    >
+                      <PlayCircle className="h-4 w-4" />
+                      {sessionCount >= MAX_DAILY_SESSIONS ? "Daily Limit Reached" : "Start Watching & Earn"}
+                    </Button>
                   </div>
                 </div>
-              </div>
-              <div className="w-full bg-secondary rounded-full h-2.5 mt-4">
-                <div
-                  className="bg-primary h-2.5 rounded-full"
-                  style={{ width: `${(watchCount / dailyLimit) * 100}%` }}
-                ></div>
-              </div>
+              )}
             </CardContent>
-            <CardFooter>
-              <Button 
-                className="w-full" 
-                disabled={isLoading || watchCount >= dailyLimit}
-                onClick={handleAdInteraction}
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Processing...
-                  </>
-                ) : watchCount >= dailyLimit ? (
-                  <>
-                    <BadgeCheck className="mr-2 h-4 w-4" />
-                    Daily Limit Reached
-                  </>
-                ) : (
-                  "Watch Ad & Earn $5"
-                )}
-              </Button>
+            <CardFooter className="bg-muted/50 p-4">
+              <div className="flex items-center w-full justify-between">
+                <div className="flex items-center gap-2">
+                  <Timer className="h-5 w-5 text-muted-foreground" />
+                  <span className="text-muted-foreground">
+                    Watch time: {WATCH_TIME_REQUIRED} seconds
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Award className="h-5 w-5 text-earniverse-gold" />
+                  <span>Reward: ${WATCH_TIME_REWARD.toFixed(2)}</span>
+                </div>
+              </div>
             </CardFooter>
           </Card>
           
-          {/* Ad iframe */}
-          <Card className="md:col-span-2 overflow-hidden">
-            <CardHeader>
-              <CardTitle>Featured Sponsor</CardTitle>
-              <CardDescription>
-                Interact with our sponsored content to earn rewards
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="h-[400px] overflow-hidden">
-              <div className="relative w-full h-full rounded-md overflow-hidden border border-border">
-                <iframe 
-                  src="https://www.profitableratecpm.com/a6ugtn3snv?key=58e9c4fff9308ccfc8012ab15de3da92"
-                  className="w-full h-full"
-                  title="Sponsored Content"
-                  sandbox="allow-forms allow-scripts allow-same-origin"
-                ></iframe>
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Daily Progress</CardTitle>
+                <CardDescription>Track your daily earning progress</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <span className="text-sm text-muted-foreground">Completed Today</span>
+                      <span className="font-medium">{sessionCount} / {MAX_DAILY_SESSIONS}</span>
+                    </div>
+                    <Progress value={(sessionCount / MAX_DAILY_SESSIONS) * 100} />
+                  </div>
+                  
+                  <div className="pt-4 border-t">
+                    <div className="flex justify-between mb-1 text-sm">
+                      <span>Earned Today</span>
+                      <span className="font-medium">${(sessionCount * WATCH_TIME_REWARD).toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span>Potential Earnings</span>
+                      <span className="font-medium">${(MAX_DAILY_SESSIONS * WATCH_TIME_REWARD).toFixed(2)}</span>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Important!</AlertTitle>
+              <AlertDescription>
+                Make sure to actually watch the ads to earn rewards. Engaging with the content ensures you get credited properly.
+              </AlertDescription>
+            </Alert>
+            
+            {/* Insert AdsTerra Ad */}
+            <div className="ad-container rounded-lg overflow-hidden border bg-card p-2">
+              <div className="text-xs text-muted-foreground mb-2">Advertisement</div>
+              <div id="adsterra-container">
+                <script type='text/javascript' src='//pl26348512.profitableratecpm.com/ea/00/c2/ea00c271bf6e93057d29e6b0345a8668.js'></script>
               </div>
-            </CardContent>
-            <CardFooter className="flex justify-between">
-              <div className="text-sm text-muted-foreground">
-                Ads by AdsTerra
-              </div>
-              <Button variant="outline" size="sm" onClick={() => window.open('https://www.profitableratecpm.com/a6ugtn3snv?key=58e9c4fff9308ccfc8012ab15de3da92', '_blank')}>
-                Open in New Window
-                <ExternalLink className="ml-2 h-4 w-4" />
-              </Button>
-            </CardFooter>
-          </Card>
-        </div>
-        
-        {/* AdsTerra embedded ad */}
-        <div className="mt-6 p-4 border border-border rounded-md bg-background">
-          <div className="text-sm text-muted-foreground mb-4">
-            Featured Ads
-          </div>
-          <div id="adsterra-container" className="w-full min-h-[250px] flex items-center justify-center">
-            <script type='text/javascript' src='//pl26348512.profitableratecpm.com/ea/00/c2/ea00c271bf6e93057d29e6b0345a8668.js'></script>
+            </div>
           </div>
         </div>
       </div>

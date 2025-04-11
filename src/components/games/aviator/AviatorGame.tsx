@@ -6,11 +6,12 @@ import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
 import { Plane, Volume2, VolumeX, History, Users, TrendingUp } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { fetchUserBalance } from "@/services/userService";
+import { fetchUserBalance, userService } from "@/services/userService";
 import { generateCrashPoint, calculateWinnings, formatMultiplier, shouldContinueGame, getMultiplierColor } from "@/utils/aviatorUtils";
 import AviatorParticles from "./AviatorParticles";
 import Airplane from "./Airplane";
 import { useAviatorSounds } from "@/hooks/useAviatorSounds";
+import { playAviator } from "@/services/gameService";
 
 interface AviatorGameProps {
   onGameComplete?: () => void;
@@ -37,37 +38,41 @@ const AviatorGame: React.FC<AviatorGameProps> = ({ onGameComplete }) => {
   const [countingUp, setCountingUp] = useState(false);
   const [displayedMultiplier, setDisplayedMultiplier] = useState("1.00x");
   
-  useEffect(() => {
+  const fetchBalance = useCallback(async () => {
     if (user) {
-      fetchUserBalance(user.id).then((data) => {
-        if (data) {
+      try {
+        // Use edge function directly for most reliable balance
+        const { data, error } = await supabase.functions.invoke("get_user_balance", {
+          body: { user_id: user.id }
+        });
+        
+        if (error) {
+          console.error("Edge function error:", error);
+          
+          // Fallback to regular service
+          const balanceData = await fetchUserBalance(user.id);
+          if (balanceData) {
+            setBalance(balanceData.balance);
+          } else {
+            setBalance(0);
+          }
+          
+        } else if (data.success) {
           setBalance(data.balance);
         } else {
-          console.log("Fetching balance via edge function");
-          fetch(`https://fghuralujkiddeuncyml.supabase.co/functions/v1/get_user_balance`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ user_id: user.id })
-          })
-          .then(response => response.json())
-          .then(data => {
-            if (data.success) {
-              setBalance(data.balance);
-            } else {
-              console.error("Failed to get balance from edge function:", data.error);
-              setBalance(0);
-            }
-          })
-          .catch(error => {
-            console.error("Error fetching balance:", error);
-            setBalance(0);
-          });
+          console.error("Failed to get balance from edge function:", data.error);
+          setBalance(0);
         }
-      });
+      } catch (error) {
+        console.error("Error fetching balance:", error);
+        setBalance(0);
+      }
     }
   }, [user]);
+  
+  useEffect(() => {
+    fetchBalance();
+  }, [fetchBalance]);
 
   useEffect(() => {
     if (!isPlaying) return;
@@ -182,28 +187,65 @@ const AviatorGame: React.FC<AviatorGameProps> = ({ onGameComplete }) => {
     }
   }, [user, isPlaying, startNewGame, betAmount, balance, playSound]);
 
-  const cashOut = useCallback(() => {
-    if (!hasBet || cashedOut) return;
+  const cashOut = useCallback(async () => {
+    if (!hasBet || cashedOut || !user) return;
     
-    const winnings = calculateWinnings(betAmount, multiplier);
-    setWinAmount(winnings);
+    const currentMultiplier = multiplier;
+    const calculatedWinnings = calculateWinnings(betAmount, currentMultiplier);
+    setWinAmount(calculatedWinnings);
     setCashedOut(true);
     
+    // Show immediate feedback
     toast({
-      title: "Cashed Out!",
-      description: `You won $${winnings.toFixed(2)} at ${formatMultiplier(multiplier)}`,
+      title: "Cashing Out...",
+      description: `Processing your winnings of $${calculatedWinnings.toFixed(2)}`,
     });
     
     playSound('cashout');
     
-    if (balance !== null) {
-      setBalance(balance + winnings);
+    try {
+      // Call the game service to record the win and update balance
+      const result = await playAviator(user.id, betAmount, currentMultiplier, crashPoint);
+      
+      if (result.success) {
+        toast({
+          title: "Cashed Out!",
+          description: `You won $${calculatedWinnings.toFixed(2)} at ${formatMultiplier(currentMultiplier)}`,
+        });
+        
+        // Update balance with the new value from the server
+        if (result.newBalance !== undefined) {
+          setBalance(result.newBalance);
+        } else {
+          // Refresh balance from server if no new balance returned
+          fetchBalance();
+        }
+        
+        if (onGameComplete) {
+          onGameComplete();
+        }
+      } else {
+        toast({
+          title: "Error Processing Win",
+          description: result.error || "There was a problem processing your winnings",
+          variant: "destructive",
+        });
+        
+        // Refresh balance to ensure it's accurate
+        fetchBalance();
+      }
+    } catch (error) {
+      console.error("Error processing aviator win:", error);
+      toast({
+        title: "Error",
+        description: "There was a problem processing your winnings",
+        variant: "destructive",
+      });
+      
+      // Refresh balance to ensure it's accurate
+      fetchBalance();
     }
-    
-    if (onGameComplete) {
-      onGameComplete();
-    }
-  }, [hasBet, cashedOut, betAmount, multiplier, balance, playSound, onGameComplete]);
+  }, [hasBet, cashedOut, user, betAmount, multiplier, crashPoint, playSound, onGameComplete, fetchBalance]);
 
   return (
     <Card className="w-full overflow-hidden relative">

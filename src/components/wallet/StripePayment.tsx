@@ -2,7 +2,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CreditCard } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { Loader2 } from "lucide-react";
@@ -36,30 +35,28 @@ const StripePayment = ({ amount, onSuccess }: StripePaymentProps) => {
         return;
       }
 
-      // Call our Supabase Edge Function to create a Stripe checkout session
-      const response = await fetch("https://fghuralujkiddeuncyml.supabase.co/functions/v1/create-stripe-checkout", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
+      console.log("Creating Stripe checkout session for amount:", parsedAmount);
+      
+      // Call Supabase Edge Function directly to create a Stripe checkout session
+      const { data, error } = await supabase.functions.invoke("create-stripe-checkout", {
+        body: {
           amount: parsedAmount,
           userId,
           userEmail,
           userName
-        }),
+        }
       });
 
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to create checkout session");
+      if (error) {
+        throw new Error(error.message || "Failed to create checkout session");
       }
-
-      if (!data.url) {
+      
+      if (!data?.url) {
         throw new Error("No checkout URL returned");
       }
 
+      console.log("Redirecting to Stripe checkout:", data.url);
+      
       // Redirect to Stripe Checkout
       window.location.href = data.url;
     } catch (error: any) {

@@ -50,25 +50,23 @@ const fetchUserProfile = async (userId: string): Promise<UserProfile | null> => 
   }
 };
 
-// Fetch user balance with fallback to edge function
+// Fetch user balance using edge function first for reliability
 const fetchUserBalance = async (userId: string): Promise<UserBalance | null> => {
   try {
     console.info(`Fetching balance for user: ${userId}`);
     
-    // Try fetching balance directly from edge function first (more reliable)
+    // Use edge function for most reliable balance retrieval
     try {
-      const response = await fetch(`https://fghuralujkiddeuncyml.supabase.co/functions/v1/get_user_balance`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ user_id: userId })
+      const { data: edgeFunctionData, error: edgeFunctionError } = await supabase.functions.invoke("get_user_balance", {
+        body: { user_id: userId }
       });
       
-      const edgeFunctionData = await response.json();
+      if (edgeFunctionError) {
+        throw new Error(`Edge function error: ${edgeFunctionError.message}`);
+      }
       
-      if (edgeFunctionData.success) {
-        console.info(`Successfully fetched balance from DB: ${edgeFunctionData.balance}`);
+      if (edgeFunctionData?.success) {
+        console.info(`Successfully fetched balance from edge function: ${edgeFunctionData.balance}`);
         
         // Create a balance object from the edge function response
         return {
@@ -81,7 +79,7 @@ const fetchUserBalance = async (userId: string): Promise<UserBalance | null> => 
         };
       }
       
-      throw new Error(edgeFunctionData.error || "Failed to fetch balance from edge function");
+      throw new Error(edgeFunctionData?.error || "Failed to fetch balance from edge function");
     } catch (edgeFunctionError: any) {
       console.warn("Edge function fallback failed, trying direct DB access:", edgeFunctionError.message);
       
@@ -128,6 +126,42 @@ const fetchUserTransactions = async (userId: string): Promise<Transaction[]> => 
   }
 };
 
+// Update user balance after game or other activity
+const updateUserBalance = async (
+  userId: string,
+  amount: number,
+  transactionType: string,
+  description: string,
+  referenceId?: string
+): Promise<{ success: boolean; newBalance?: number; error?: string }> => {
+  try {
+    // Call the Supabase Edge Function to update balance
+    const { data, error } = await supabase.functions.invoke("update_balance_after_game", {
+      body: {
+        p_user_id: userId,
+        p_amount: amount,
+        p_game_session_id: referenceId || null,
+        p_transaction_type: transactionType,
+        p_description: description
+      }
+    });
+    
+    if (error) {
+      console.error("Error updating balance:", error);
+      return { success: false, error: error.message };
+    }
+    
+    if (!data.success) {
+      return { success: false, error: data.error || "Failed to update balance" };
+    }
+    
+    return { success: true, newBalance: data.new_balance };
+  } catch (error: any) {
+    console.error("Unexpected error updating balance:", error);
+    return { success: false, error: "An unexpected error occurred" };
+  }
+};
+
 // Update user profile
 const updateUserProfile = async (
   userId: string, 
@@ -155,7 +189,8 @@ export const userService = {
   fetchUserProfile,
   fetchUserBalance,
   fetchUserTransactions,
-  updateUserProfile
+  updateUserProfile,
+  updateUserBalance
 };
 
 // Also export individual functions for backward compatibility
@@ -163,5 +198,6 @@ export {
   fetchUserProfile,
   fetchUserBalance,
   fetchUserTransactions,
-  updateUserProfile
+  updateUserProfile,
+  updateUserBalance
 };
