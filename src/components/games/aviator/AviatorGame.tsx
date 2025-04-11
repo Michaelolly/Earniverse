@@ -12,6 +12,7 @@ import AviatorParticles from "./AviatorParticles";
 import Airplane from "./Airplane";
 import { useAviatorSounds } from "@/hooks/useAviatorSounds";
 import { playAviator } from "@/services/gameService";
+import { supabase } from "@/integrations/supabase/client";
 
 interface AviatorGameProps {
   onGameComplete?: () => void;
