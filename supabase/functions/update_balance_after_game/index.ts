@@ -37,6 +37,17 @@ serve(async (req) => {
     const currentBalance = balanceData?.balance || 0;
     const newBalance = currentBalance + p_amount;
 
+    // Prevent negative balance
+    if (newBalance < 0) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Insufficient funds" }),
+        { 
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400
+        }
+      );
+    }
+
     console.log(`Current balance: $${currentBalance}, New balance: $${newBalance}`);
 
     // Check if user balance record exists
@@ -84,7 +95,7 @@ serve(async (req) => {
     }
 
     // Update totals based on win/loss
-    if (p_amount > 0) {
+    if (p_amount > 0 && (p_transaction_type === 'game_win' || p_transaction_type === 'investment_sale')) {
       // Update total winnings
       await supabaseClient
         .from("user_balances")
@@ -92,7 +103,7 @@ serve(async (req) => {
           total_winnings: supabaseClient.rpc('get_coalesce_sum', { val: 'total_winnings', user_id: p_user_id, amount: p_amount })
         })
         .eq("user_id", p_user_id);
-    } else if (p_amount < 0) {
+    } else if (p_amount < 0 && (p_transaction_type === 'game_loss' || p_transaction_type === 'investment_purchase')) {
       // Update total losses (store as positive number)
       await supabaseClient
         .from("user_balances")

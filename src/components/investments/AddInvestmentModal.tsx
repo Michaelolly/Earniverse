@@ -107,6 +107,9 @@ const AddInvestmentModal = ({ onInvestmentAdded }: AddInvestmentModalProps) => {
           currentValue: currentValue
         });
         
+        // Update the displayed balance
+        setUserBalance(prev => prev - investmentAmount);
+        
         setStep(2); // Move to results step
         onInvestmentAdded(); // Notify parent to refresh investments
       } else {

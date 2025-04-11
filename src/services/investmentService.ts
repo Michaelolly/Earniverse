@@ -1,6 +1,7 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { updateUserBalance } from "./userService";
 
 export interface Investment {
   id: string;
@@ -24,7 +25,7 @@ export interface InvestmentOpportunity {
   risk_level: 'Low' | 'Medium' | 'High';
 }
 
-// Sample investment opportunities
+// Sample investment opportunities - crypto and stocks
 export const INVESTMENT_OPPORTUNITIES: InvestmentOpportunity[] = [
   {
     id: '1',
@@ -65,6 +66,46 @@ export const INVESTMENT_OPPORTUNITIES: InvestmentOpportunity[] = [
     potential_return_min: 15,
     potential_return_max: 30,
     risk_level: 'High'
+  },
+  {
+    id: '5',
+    name: 'Bitcoin (BTC)',
+    description: 'Direct investment in Bitcoin, the leading cryptocurrency',
+    category: 'Crypto',
+    min_investment: 50,
+    potential_return_min: 20,
+    potential_return_max: 40,
+    risk_level: 'High'
+  },
+  {
+    id: '6',
+    name: 'Ethereum (ETH)',
+    description: 'Direct investment in Ethereum, the leading smart contract platform',
+    category: 'Crypto',
+    min_investment: 50,
+    potential_return_min: 18,
+    potential_return_max: 35,
+    risk_level: 'High'
+  },
+  {
+    id: '7',
+    name: 'Blue Chip Stock Portfolio',
+    description: 'Collection of stable, established companies with consistent performance',
+    category: 'Stock',
+    min_investment: 300,
+    potential_return_min: 8,
+    potential_return_max: 12,
+    risk_level: 'Low'
+  },
+  {
+    id: '8',
+    name: 'Growth Stocks Index',
+    description: 'Focused on high-growth technology and consumer companies',
+    category: 'Stock',
+    min_investment: 200,
+    potential_return_min: 10,
+    potential_return_max: 20,
+    risk_level: 'Medium'
   }
 ];
 
@@ -100,27 +141,25 @@ export const createInvestment = async (
   investment: Omit<Investment, 'id' | 'user_id' | 'last_updated'>
 ): Promise<{ success: boolean; investment?: Investment; error?: string }> => {
   try {
-    // Check user's balance first
-    const { data: balanceData, error: balanceError } = await supabase
-      .from('user_balances')
-      .select('balance')
-      .eq('user_id', userId)
-      .single();
+    console.log(`Creating investment for user ${userId}: ${investment.name} - $${investment.amount_invested}`);
     
-    if (balanceError) {
-      console.error('Error fetching balance:', balanceError);
-      return { success: false, error: 'Could not retrieve your balance' };
+    // Deduct the investment amount from user's balance using the updateUserBalance function
+    const balanceUpdate = await updateUserBalance(
+      userId,
+      -investment.amount_invested,
+      'investment_purchase',
+      `Investment in ${investment.name}`,
+      undefined // No reference ID yet
+    );
+    
+    if (!balanceUpdate.success) {
+      console.error('Failed to update balance:', balanceUpdate.error);
+      return { success: false, error: balanceUpdate.error || 'Could not update balance' };
     }
     
-    if (!balanceData) {
-      return { success: false, error: 'Could not retrieve your balance' };
-    }
+    console.log(`Balance updated successfully. New balance: ${balanceUpdate.newBalance}`);
     
-    if (balanceData.balance < investment.amount_invested) {
-      return { success: false, error: 'Insufficient balance for this investment' };
-    }
-    
-    // Create the investment
+    // Create the investment record
     const newInvestment = {
       user_id: userId,
       name: investment.name,
@@ -138,34 +177,18 @@ export const createInvestment = async (
     
     if (error) {
       console.error('Error creating investment:', error);
+      // If investment creation fails, we should refund the user
+      await updateUserBalance(
+        userId,
+        investment.amount_invested, // Refund the investment amount
+        'investment_refund',
+        `Refund for failed investment in ${investment.name}`,
+        undefined
+      );
       return { success: false, error: error.message };
     }
     
-    // Deduct the investment amount from user's balance
-    const { error: transactionError } = await supabase
-      .from('transactions')
-      .insert({
-        user_id: userId,
-        amount: -investment.amount_invested,
-        type: 'investment',
-        description: `Investment in ${investment.name}`
-      });
-    
-    if (transactionError) {
-      console.error('Error creating transaction:', transactionError);
-      return { success: false, error: 'Investment created but failed to record transaction' };
-    }
-    
-    // Update user balance
-    const { error: balanceUpdateError } = await supabase
-      .from('user_balances')
-      .update({ balance: balanceData.balance - investment.amount_invested })
-      .eq('user_id', userId);
-    
-    if (balanceUpdateError) {
-      console.error('Error updating balance:', balanceUpdateError);
-      return { success: false, error: 'Investment created but failed to update balance' };
-    }
+    console.log('Investment record created successfully:', data);
     
     return { success: true, investment: data };
   } catch (error) {
@@ -203,7 +226,7 @@ export const updateInvestment = async (
   }
 };
 
-export const sellInvestment = async (investmentId: string, userId: string): Promise<{ success: boolean; error?: string }> => {
+export const sellInvestment = async (investmentId: string, userId: string): Promise<{ success: boolean; error?: string; newBalance?: number }> => {
   try {
     // Get the investment to sell
     const { data: investment, error: fetchError } = await supabase
@@ -218,6 +241,8 @@ export const sellInvestment = async (investmentId: string, userId: string): Prom
       return { success: false, error: 'Investment not found' };
     }
     
+    console.log(`Selling investment for user ${userId}: ${investment.name} - Current value: $${investment.current_value}`);
+    
     // Delete the investment
     const { error: deleteError } = await supabase
       .from('user_investments')
@@ -230,47 +255,30 @@ export const sellInvestment = async (investmentId: string, userId: string): Prom
       return { success: false, error: deleteError.message };
     }
     
-    // Add transaction record
-    const { error: transactionError } = await supabase
-      .from('transactions')
-      .insert({
-        user_id: userId,
-        amount: investment.current_value,
-        type: 'investment_sale',
-        description: `Sale of investment in ${investment.name}`
-      });
+    // Add the investment's current value to user's balance
+    const balanceUpdate = await updateUserBalance(
+      userId,
+      investment.current_value,
+      'investment_sale',
+      `Sale of investment in ${investment.name}`,
+      investmentId
+    );
     
-    if (transactionError) {
-      console.error('Error creating transaction:', transactionError);
-      return { success: false, error: 'Investment sold but failed to record transaction' };
-    }
-    
-    // Update user balance - first get the current balance
-    const { data: balanceData, error: balanceError } = await supabase
-      .from('user_balances')
-      .select('balance')
-      .eq('user_id', userId)
-      .single();
-    
-    if (balanceError || !balanceData) {
-      console.error('Error fetching balance:', balanceError);
+    if (!balanceUpdate.success) {
+      console.error('Error updating balance after investment sale:', balanceUpdate.error);
+      
+      // If the balance update fails, we should try to restore the investment
+      await supabase.from('user_investments').insert(investment);
+      
       return { success: false, error: 'Investment sold but failed to update balance' };
     }
     
-    // Now update the balance with the investment's current value
-    const { error: updateError } = await supabase
-      .from('user_balances')
-      .update({ 
-        balance: balanceData.balance + investment.current_value 
-      })
-      .eq('user_id', userId);
+    console.log(`Balance updated successfully after investment sale. New balance: ${balanceUpdate.newBalance}`);
     
-    if (updateError) {
-      console.error('Error updating balance:', updateError);
-      return { success: false, error: 'Investment sold but failed to update balance' };
-    }
-    
-    return { success: true };
+    return { 
+      success: true,
+      newBalance: balanceUpdate.newBalance
+    };
   } catch (error) {
     console.error('Unexpected error selling investment:', error);
     return { success: false, error: 'An unexpected error occurred' };
