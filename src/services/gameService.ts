@@ -114,6 +114,8 @@ export const playGame = async (
     const transactionType = balanceChange >= 0 ? 'game_win' : 'game_loss';
     const description = `${transactionType === 'game_win' ? 'Won' : 'Lost'} in ${gameId}`;
     
+    console.log(`Game outcome: ${gameOutcome.outcome}, Balance change: ${balanceChange}`);
+    
     // Update user's balance
     const balanceUpdate = await updateUserBalance(
       userId,
@@ -126,6 +128,8 @@ export const playGame = async (
     if (!balanceUpdate.success) {
       return { success: false, error: balanceUpdate.error };
     }
+    
+    console.log(`Balance updated successfully. New balance: ${balanceUpdate.newBalance}`);
     
     return { 
       success: true, 
@@ -242,6 +246,7 @@ export const playAviator = async (
       .single();
     
     if (gameError || !gameData) {
+      console.error("Could not find Aviat game:", gameError);
       return { success: false, error: 'Game not found' };
     }
     
@@ -250,6 +255,8 @@ export const playAviator = async (
     
     // Calculate win amount (bet * multiplier for a win, 0 for a loss)
     const winAmount = isWin ? betAmount * cashoutMultiplier : 0;
+    
+    console.log(`Aviator game: Bet $${betAmount}, Crashed at ${crashPoint.toFixed(2)}, Cashed out at ${cashoutMultiplier ? cashoutMultiplier.toFixed(2) : 'N/A'}, Win amount: $${winAmount.toFixed(2)}`);
     
     // Record game outcome
     const gameOutcome = {
@@ -260,8 +267,11 @@ export const playAviator = async (
     const playResult = await playGame(userId, gameData.id, betAmount, gameOutcome);
     
     if (!playResult.success) {
+      console.error("Failed to process game result:", playResult.error);
       return { success: false, error: playResult.error };
     }
+    
+    console.log(`Game processed successfully. New balance: ${playResult.newBalance}`);
     
     return { 
       success: true, 
@@ -273,5 +283,49 @@ export const playAviator = async (
   } catch (error: any) {
     console.error('Error in playAviator:', error);
     return { success: false, error: 'An unexpected error occurred' };
+  }
+};
+
+export const fetchGames = async (): Promise<Game[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('games')
+      .select('*')
+      .eq('active', true);
+    
+    if (error) {
+      console.error('Error fetching games:', error);
+      toast({
+        title: "Failed to load games",
+        description: error.message,
+        variant: "destructive",
+      });
+      return [];
+    }
+    
+    return data || [];
+  } catch (error: any) {
+    console.error('Unexpected error fetching games:', error);
+    return [];
+  }
+};
+
+export const fetchGameHistory = async (userId: string): Promise<GameSession[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('game_sessions')
+      .select('*')
+      .eq('user_id', userId)
+      .order('played_at', { ascending: false });
+    
+    if (error) {
+      console.error('Error fetching game history:', error);
+      return [];
+    }
+    
+    return data || [];
+  } catch (error: any) {
+    console.error('Unexpected error fetching game history:', error);
+    return [];
   }
 };

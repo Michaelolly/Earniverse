@@ -97,6 +97,9 @@ const AviatorGame: React.FC<AviatorGameProps> = ({ onGameComplete }) => {
           variant: "destructive",
         });
         playSound('crash');
+        
+        // Refresh balance after losing
+        fetchBalance();
       }
       
       setGameHistory(prev => [
@@ -110,7 +113,7 @@ const AviatorGame: React.FC<AviatorGameProps> = ({ onGameComplete }) => {
     }
     
     return () => clearInterval(interval);
-  }, [isPlaying, multiplier, crashPoint, hasBet, cashedOut, playSound]);
+  }, [isPlaying, multiplier, crashPoint, hasBet, cashedOut, playSound, fetchBalance]);
 
   useEffect(() => {
     if (isPlaying) {
@@ -184,7 +187,8 @@ const AviatorGame: React.FC<AviatorGameProps> = ({ onGameComplete }) => {
     playSound('bet');
     
     if (balance !== null) {
-      setBalance(balance - betAmount);
+      // Optimistically update the balance for better UX
+      setBalance(prevBalance => prevBalance !== null ? prevBalance - betAmount : null);
     }
   }, [user, isPlaying, startNewGame, betAmount, balance, playSound]);
 
@@ -216,9 +220,11 @@ const AviatorGame: React.FC<AviatorGameProps> = ({ onGameComplete }) => {
         
         // Update balance with the new value from the server
         if (result.newBalance !== undefined) {
+          console.log("Setting new balance from result:", result.newBalance);
           setBalance(result.newBalance);
         } else {
           // Refresh balance from server if no new balance returned
+          console.log("No new balance returned, fetching from server");
           fetchBalance();
         }
         
@@ -233,6 +239,7 @@ const AviatorGame: React.FC<AviatorGameProps> = ({ onGameComplete }) => {
         });
         
         // Refresh balance to ensure it's accurate
+        console.log("Error processing win, refreshing balance");
         fetchBalance();
       }
     } catch (error) {

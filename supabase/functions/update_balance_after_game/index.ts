@@ -21,6 +21,8 @@ serve(async (req) => {
 
     const { p_user_id, p_amount, p_game_session_id, p_transaction_type, p_description } = await req.json();
 
+    console.log(`Processing balance update for user ${p_user_id}: ${p_amount} (${p_transaction_type})`);
+
     // Get current balance
     const { data: balanceData, error: balanceError } = await supabaseClient
       .from("user_balances")
