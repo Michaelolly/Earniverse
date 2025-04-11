@@ -36,7 +36,7 @@ const fetchUserProfile = async (userId: string): Promise<UserProfile | null> => 
       .from('profiles')
       .select('*')
       .eq('id', userId)
-      .single();
+      .maybeSingle();
     
     if (error) {
       console.error("Error fetching profile:", error);
@@ -53,64 +53,57 @@ const fetchUserProfile = async (userId: string): Promise<UserProfile | null> => 
 // Fetch user balance with fallback to edge function
 const fetchUserBalance = async (userId: string): Promise<UserBalance | null> => {
   try {
-    // Try fetching balance from database directly first
-    const { data, error } = await supabase
-      .from('user_balances')
-      .select('*')
-      .eq('user_id', userId)
-      .single();
+    console.info(`Fetching balance for user: ${userId}`);
     
-    if (error) {
-      console.error("Error fetching user balance:", error);
+    // Try fetching balance directly from edge function first (more reliable)
+    try {
+      const response = await fetch(`https://fghuralujkiddeuncyml.supabase.co/functions/v1/get_user_balance`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ user_id: userId })
+      });
       
-      // Use edge function as fallback if there's an error with direct DB access
-      console.info("Fallback: Fetching balance via edge function");
-      try {
-        const response = await fetch(`https://fghuralujkiddeuncyml.supabase.co/functions/v1/get_user_balance`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ user_id: userId })
-        });
+      const edgeFunctionData = await response.json();
+      
+      if (edgeFunctionData.success) {
+        console.info(`Successfully fetched balance from DB: ${edgeFunctionData.balance}`);
         
-        const edgeFunctionData = await response.json();
-        
-        if (!edgeFunctionData.success) {
-          console.error("Error from edge function:", edgeFunctionData.error);
-          toast({
-            title: "Error",
-            description: "Failed to fetch your balance",
-            variant: "destructive",
-          });
-          return null;
-        }
-        
-        console.info(`Got balance from edge function: ${edgeFunctionData.balance}`);
         // Create a balance object from the edge function response
         return {
           id: 'edge-function-balance',
           user_id: userId,
-          balance: edgeFunctionData.balance,
+          balance: edgeFunctionData.balance || 0,
           total_winnings: 0, // Edge function doesn't return these yet
           total_losses: 0,   // Edge function doesn't return these yet
           updated_at: new Date().toISOString(),
         };
-      } catch (edgeFunctionError) {
-        console.error("Error from edge function:", edgeFunctionError);
-        toast({
-          title: "Error",
-          description: "Failed to fetch your balance",
-          variant: "destructive",
-        });
-        return null;
       }
+      
+      throw new Error(edgeFunctionData.error || "Failed to fetch balance from edge function");
+    } catch (edgeFunctionError: any) {
+      console.warn("Edge function fallback failed, trying direct DB access:", edgeFunctionError.message);
+      
+      // Fall back to direct database access
+      const { data, error } = await supabase
+        .from('user_balances')
+        .select('*')
+        .eq('user_id', userId)
+        .maybeSingle();
+      
+      if (error) {
+        throw error;
+      }
+      
+      console.info(`Successfully fetched balance from DB: ${data?.balance}`);
+      return data;
     }
-    
-    return data;
-  } catch (error) {
-    console.error("Unexpected error fetching user balance:", error);
+  } catch (error: any) {
+    console.error("Error fetching user balance:", error);
     return null;
+  } finally {
+    console.info("Wallet data fetch complete");
   }
 };
 
@@ -151,7 +144,7 @@ const updateUserProfile = async (
     }
     
     return { success: true };
-  } catch (error) {
+  } catch (error: any) {
     console.error("Unexpected error updating profile:", error);
     return { success: false, error: "Failed to update profile" };
   }

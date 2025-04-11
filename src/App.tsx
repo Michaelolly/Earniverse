@@ -15,6 +15,7 @@ import Wallet from "./pages/Wallet";
 import Settings from "./pages/Settings";
 import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
+import WatchAndEarn from "./pages/WatchAndEarn";
 import "./App.css";
 
 const queryClient = new QueryClient({
@@ -41,6 +42,7 @@ const App = () => (
             <Route path="/investments" element={<Investments />} />
             <Route path="/games" element={<Games />} />
             <Route path="/wallet" element={<Wallet />} />
+            <Route path="/watch-and-earn" element={<WatchAndEarn />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/admin" element={<Admin />} />
             <Route path="*" element={<NotFound />} />

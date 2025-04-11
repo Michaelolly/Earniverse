@@ -14,7 +14,8 @@ import {
   BarChart2,
   Gamepad2,
   CheckSquare,
-  Wallet
+  Wallet,
+  MonitorPlay
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -67,6 +68,11 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
       name: "Wallet",
       path: "/wallet",
       icon: <Wallet size={20} />,
+    },
+    {
+      name: "Watch & Earn",
+      path: "/watch-and-earn",
+      icon: <MonitorPlay size={20} />,
     },
     {
       name: "Settings",

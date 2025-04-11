@@ -37,17 +37,23 @@ const StripePayment = ({ amount, onSuccess }: StripePaymentProps) => {
       }
 
       // Call our Supabase Edge Function to create a Stripe checkout session
-      const { data, error } = await supabase.functions.invoke('create-stripe-checkout', {
-        body: {
+      const response = await fetch("https://fghuralujkiddeuncyml.supabase.co/functions/v1/create-stripe-checkout", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
           amount: parsedAmount,
           userId,
           userEmail,
           userName
-        },
+        }),
       });
 
-      if (error) {
-        throw new Error(error.message || "Failed to create checkout session");
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to create checkout session");
       }
 
       if (!data.url) {
